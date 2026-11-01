@@ -1,0 +1,88 @@
+/* ==========================================================
+   FOUND · animaciones (v20 · motion design)
+   Personalidad «Premium» (moda): movimientos suaves, sin rebotes
+   salvo al guardar una prenda (un pequeño momento de alegría).
+   · Curva de la marca: cubic-bezier(.4,0,.2,1) para casi todo.
+   · Tres duraciones: rápida 160 ms, normal 320 ms, lenta 520 ms.
+   · Entrada única: aparecer subiendo 14 px + transparencia.
+   · Solo se anima transform y opacity (no bloquea el móvil).
+   · Con «reducir movimiento» del sistema: solo fundidos cortos.
+   Para quitar todas las animaciones basta con borrar motion.css y motion.js.
+   ========================================================== */
+:root{
+  --m-ease:cubic-bezier(.4,0,.2,1);        /* firma de la marca */
+  --m-out:cubic-bezier(.05,.7,.1,1);       /* entradas con énfasis */
+  --m-in:cubic-bezier(.3,0,1,1);           /* salidas */
+  --m-pop:cubic-bezier(.175,.885,.32,1.275);/* solo para «guardar» */
+  --m-quick:160ms; --m-std:320ms; --m-slow:520ms;
+}
+@media (max-width:820px){:root{--m-quick:130ms;--m-std:260ms;--m-slow:420ms}}
+
+/* ---------- cambio de pantalla: la nueva sube un poco y aparece ---------- */
+@keyframes m-view{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.m-on #view.m-enter{animation:m-view var(--m-std) var(--m-ease) both}
+
+/* ---------- prendas, marcas y estilos: aparecen en cascada al llegar a la pantalla
+   (solo la primera vez que ves cada sección en una visita; después, directamente) ---------- */
+.m-on .m-reveal{opacity:0;transform:translateY(14px) scale(.985)}
+.m-on .m-reveal.m-in{opacity:1;transform:none;transition:opacity var(--m-std) var(--m-ease),transform var(--m-slow) var(--m-out);transition-delay:var(--m-d,0ms)}
+
+/* ---------- portada: las tres fotos del escaparate entran una detrás de otra ---------- */
+@keyframes m-hero{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:none}}
+.m-on .hpics .hpic{animation:m-hero var(--m-slow) var(--m-out) both}
+.m-on .hpics .hpic:nth-child(2){animation-delay:90ms}
+.m-on .hpics .hpic:nth-child(3){animation-delay:180ms}
+.m-on .htext h1,.m-on .htext .lead,.m-on .htext .ctas,.m-on .htext .cta-sub{animation:m-view var(--m-slow) var(--m-ease) both}
+.m-on .htext .lead{animation-delay:60ms}
+.m-on .htext .ctas{animation-delay:120ms}
+.m-on .htext .cta-sub{animation-delay:170ms}
+
+/* ---------- tarjetas: al pasar el ratón la foto se acerca y la tarjeta se eleva ---------- */
+.m-on .card .tile{transition:transform var(--m-std) var(--m-ease),box-shadow var(--m-std) var(--m-ease)}
+.m-on .card .tile img,.m-on .card .tile svg{transition:transform var(--m-slow) var(--m-ease)}
+@media (hover:hover){
+  .m-on .card:hover .tile{transform:translateY(-3px);box-shadow:0 14px 30px -18px rgba(26,26,24,.45)}
+  .m-on .card:hover .tile>img:first-child,.m-on .card:hover .tile>svg{transform:scale(1.035)}
+  .m-on .brandcard{transition:transform var(--m-std) var(--m-ease),box-shadow var(--m-std) var(--m-ease)}
+  .m-on .brandcard:hover{transform:translateY(-3px)}
+  .m-on .stylecard{transition:transform var(--m-std) var(--m-ease)}
+  .m-on .stylecard:hover{transform:translateY(-3px)}
+}
+
+/* ---------- botones: se hunden un poco al pulsar ---------- */
+.m-on .btn,.m-on .chip,.m-on .heart,.m-on .ck-btn,.m-on .wa{transition:transform var(--m-quick) var(--m-ease),filter var(--m-quick) var(--m-ease),background-color var(--m-quick) var(--m-ease)}
+.m-on .btn:active,.m-on .chip:active,.m-on .ck-btn:active{transform:scale(.97)}
+.m-on .btn .arr{transition:transform var(--m-std) var(--m-ease)}
+
+/* ---------- guardar prenda: el corazón se encoge, salta y suelta un anillo ---------- */
+@keyframes m-heart{0%{transform:scale(1)}25%{transform:scale(.82)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+@keyframes m-ring{from{opacity:.55;transform:scale(.6)}to{opacity:0;transform:scale(1.7)}}
+.m-on .m-pop{animation:m-heart 420ms var(--m-pop) both;position:relative}
+.m-on .m-pop::after{content:"";position:absolute;inset:-2px;border-radius:50%;border:2px solid #E0345B;animation:m-ring 480ms var(--m-ease) both;pointer-events:none}
+.m-on .m-unpop{animation:m-heart 260ms var(--m-ease) both}
+
+/* ---------- ficha de la prenda: el fondo se oscurece y la ficha sube ---------- */
+@keyframes m-dlg{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes m-fade{from{opacity:0}to{opacity:1}}
+.m-on dialog#dlg[open]{animation:m-dlg var(--m-std) var(--m-out) both}
+.m-on dialog#dlg[open]::backdrop{animation:m-fade var(--m-std) var(--m-ease) both}
+
+/* ---------- aviso de cookies, botón de WhatsApp y avisos ---------- */
+@keyframes m-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+.m-on .ck-in{animation:m-up var(--m-slow) var(--m-out) both;animation-delay:400ms}
+.m-on .ck-panel[open]{animation:m-dlg var(--m-std) var(--m-out) both}
+@keyframes m-wa{from{opacity:0;transform:translateY(12px) scale(.9)}to{opacity:1;transform:none}}
+.m-on .wa{animation:m-wa var(--m-slow) var(--m-out) both;animation-delay:700ms}
+@media (hover:hover){.m-on .wa:hover{transform:translateY(-2px) scale(1.03)}}
+.m-on .toast{transition:opacity var(--m-std) var(--m-ease),transform var(--m-std) var(--m-out)}
+
+/* ---------- test de estilo: la opción elegida se marca con un pequeño salto ---------- */
+.m-on .qstyle .qs-ok{transition:transform var(--m-std) var(--m-pop),opacity var(--m-quick) var(--m-ease)}
+.m-on .qstyle[aria-pressed="false"] .qs-ok{transform:scale(.4);opacity:0}
+.m-on .qstyle[aria-pressed="true"] .qs-ok{transform:scale(1);opacity:1}
+
+/* ---------- accesibilidad: con «reducir movimiento» solo fundidos cortos ---------- */
+@media (prefers-reduced-motion: reduce){
+  .m-on *,.m-on *::before,.m-on *::after{animation-duration:1ms!important;animation-delay:0ms!important;transition-duration:1ms!important;transition-delay:0ms!important}
+  .m-on .m-reveal{transform:none}
+}

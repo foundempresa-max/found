@@ -294,6 +294,17 @@ y en las líneas `canonical` de `aviso-legal.html`, `privacidad.html` y `cookies
 3. `robots.txt` solo lo lee Google si está en la raíz del dominio: con `tu-usuario.github.io/found/` no se usa (no pasa nada).
    Con dominio propio sí funciona.
 
+## 2r. Animaciones (v20)
+No hay que ejecutar nada en Supabase. Están en `motion.css` y `motion.js`; si un día no las quieres, borra esos dos archivos
+y sus dos líneas en `index.html`, y la web funciona igual.
+- Estilo «Premium» (pensado para moda): movimientos suaves y cortos, sin rebotes salvo al guardar una prenda.
+- **Al entrar:** el texto y las tres fotos de la portada aparecen una tras otra.
+- **Prendas, marcas y estilos:** aparecen en cascada al llegar a la pantalla, solo la primera vez que ves cada sección en una visita.
+- **Al pasar el ratón** (ordenador): la tarjeta se eleva y la foto se acerca un poco.
+- **Guardar:** el corazón salta y suelta un anillo.
+- **Ficha de la prenda:** el fondo se oscurece y la ficha sube. **Cambio de sección:** fundido suave. **Botones:** se hunden al pulsar.
+- Solo se anima lo que el móvil mueve sin esfuerzo. Con «reducir movimiento» activado en el teléfono, solo hay fundidos cortos.
+
 ## 3. Publicarlo en internet con GitHub Pages (gratis)
 La web vive en GitHub y los datos siguen en Supabase. En los pasos, cambia `tu-usuario` por tu usuario de GitHub.
 
