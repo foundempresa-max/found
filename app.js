@@ -155,7 +155,7 @@ function art(p, full) {
       ${lines(G.stitch, stitchC, .45, ' stroke-dasharray="1.2 .9"')}
     </g></g></svg>`;
 }
-const pic = (p, alt = '') => p.image ? `<img src="${esc(p.image)}" alt="${esc(alt)}" loading="lazy">` : art(p);
+const pic = (p, alt) => p.image ? `<img src="${esc(p.image)}" alt="${esc(alt === undefined ? `${p.name} de ${p.brand}` : alt)}" loading="lazy" decoding="async">` : art(p);
 const ICON = {
   heart:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.6 1.1 4.6 2.7h2C14 6.1 15.6 5 17.6 5 21 5 23.1 8.4 21.6 11.8 19.5 16.4 12 21 12 21z"/></svg>',
   info:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
@@ -201,6 +201,12 @@ async function shrink(file, max, quality, type = 'image/jpeg') {
   if (type === 'image/jpeg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, c.width, c.height); }
   ctx.drawImage(bmp, 0, 0, c.width, c.height);
   return new Promise(res => c.toBlob(res, type, quality));
+}
+// v19 · fotos de prendas en WebP (pesan ~30 % menos que JPG con la misma calidad); si el navegador no sabe crear WebP, JPG
+async function shrinkBest(file, max, quality) {
+  const w = await shrink(file, max, quality - 0.04, 'image/webp');
+  if (w && w.type === 'image/webp') return { blob: w, type: 'image/webp', ext: 'webp' };
+  return { blob: await shrink(file, max, quality, 'image/jpeg'), type: 'image/jpeg', ext: 'jpg' };
 }
 // logo: cuadrado pequeño en PNG (respeta el fondo transparente); portada: horizontal en JPG
 const BRAND_IMG = { logo: { max: 400, type: 'image/png', ext: 'png' }, cover: { max: 1800, type: 'image/jpeg', ext: 'jpg' }, style: { max: 900, type: 'image/jpeg', ext: 'jpg' } };
@@ -263,12 +269,12 @@ function supabaseApi() {
       const u = data?.session?.user; if (!u) return { user: null, profile: null };
       return { user: { id: u.id, email: u.email }, profile: await getProfile(u.id) };
     },
-    async signUp({ email, password, role, brandName }) {
-      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { role, brand_name: brandName || null } } });
+    async signUp({ email, password, role, brandName, captchaToken }) {
+      const { data, error } = await sb.auth.signUp({ email, password, options: { data: { role, brand_name: brandName || null }, ...(captchaToken ? { captchaToken } : {}) } });
       fail(error);
       return { needsConfirm: !data.session, userId: data.user ? data.user.id : null };
     },
-    async signIn({ email, password }) { const { error } = await sb.auth.signInWithPassword({ email, password }); fail(error); },
+    async signIn({ email, password, captchaToken }) { const { error } = await sb.auth.signInWithPassword({ email, password, ...(captchaToken ? { options: { captchaToken } } : {}) }); fail(error); },
     async signOut() { await sb.auth.signOut(); },
     async saveProfile(uid, patch) {
       let { error } = await sb.from('profiles').update(patch).eq('id', uid);
@@ -286,9 +292,9 @@ function supabaseApi() {
       const images = [];
       for (const [i, ph] of photos.slice(0, MAX_PHOTOS).entries()) {
         if (ph.url) { images.push(ph.url); continue; }
-        const blob = await shrink(ph.file, 1400, 0.82);
-        const path = `${uid}/${Date.now()}-${i}.jpg`;
-        const up = await sb.storage.from(bucket).upload(path, blob, { contentType: 'image/jpeg' });
+        const { blob, type, ext } = await shrinkBest(ph.file, 1400, 0.82);
+        const path = `${uid}/${Date.now()}-${i}.${ext}`;
+        const up = await sb.storage.from(bucket).upload(path, blob, { contentType: type, cacheControl: '31536000' });
         fail(up.error);
         images.push(sb.storage.from(bucket).getPublicUrl(path).data.publicUrl);
       }
@@ -309,7 +315,7 @@ function supabaseApi() {
       const o = BRAND_IMG[kind];
       const blob = await shrink(file, o.max, 0.86, o.type);
       const path = `${uid}/${kind}-${Date.now()}.${o.ext}`;
-      const up = await sb.storage.from('brand-images').upload(path, blob, { contentType: o.type });
+      const up = await sb.storage.from('brand-images').upload(path, blob, { contentType: o.type, cacheControl: '31536000' });
       if (up.error) throw new Error(/bucket/i.test(up.error.message || '') ? 'Las imágenes de marca aún no están activadas (falta ejecutar marcas.sql).' : kind === 'style' && /row-level|policy|security/i.test(up.error.message || '') ? 'Para subir fotos de estilos falta ejecutar supabase/fotos-estilos.sql en Supabase.' : up.error.message);
       return sb.storage.from('brand-images').getPublicUrl(path).data.publicUrl;
     },
@@ -690,7 +696,13 @@ function T(k, def) {
 
 const isBrand = () => S.profile && S.profile.role === 'brand';
 /* ---------- estadísticas de clics ---------- */
-const VISITOR = (() => { let v = lsGet('found_vid', ''); if (!v) { v = Math.random().toString(36).slice(2) + Date.now().toString(36); lsSet('found_vid', v); } return v; })();
+// v19 · cookies: la analítica (visitas, clics de prendas y Google Analytics) solo funciona si la persona la acepta en el aviso de cookies
+const analyticsOK = () => !!(window.FOUND_CONSENT && window.FOUND_CONSENT.analytics());
+const newId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+// identificador anónimo del navegador: se guarda solo con permiso de analítica; sin permiso, uno temporal que se pierde al cerrar
+const persistentId = () => { let v = lsGet('found_vid', ''); if (!v) { v = newId(); lsSet('found_vid', v); } return v; };
+let VISITOR = analyticsOK() ? persistentId() : newId();
+if (window.FOUND_CONSENT) window.FOUND_CONSENT.onChange(st => { if (st.analytics) { VISITOR = persistentId(); lastPage = ''; trackPage(); } });
 /* ---------- visitas de la web (las ve el creador en su panel) ---------- */
 const DEVICE = (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || matchMedia('(max-width: 820px)').matches) ? 'movil' : 'ordenador';
 // de dónde viene la visita: se calcula al cargar la página, antes de limpiar la dirección
@@ -708,7 +720,9 @@ const SOURCE = (() => {
   return 'Directo';
 })();
 function logSite(kind, page, results) {
-  if (!api.logSite || isAdmin() || S.editMode) return;
+  if (!analyticsOK() || isAdmin() || S.editMode) return;
+  if (window.gtag && kind !== 'page' && kind !== 'visit') window.gtag('event', kind === 'search' ? 'search' : kind, kind === 'search' ? { search_term: page } : { page_name: page || '' });
+  if (!api.logSite) return;
   api.logSite(kind, page || null, kind === 'visit' ? SOURCE : null, DEVICE, results);
 }
 // búsquedas: se apunta lo que la persona deja escrito (tras una pausa), una vez por término y visita
@@ -725,8 +739,9 @@ function logSearchSoon() {
 }
 let lastPage = '';
 function trackPage() {
-  if (S.route === 'admin' || location.hash === lastPage) return;
+  if (!analyticsOK() || S.route === 'admin' || location.hash === lastPage) return;
   lastPage = location.hash;
+  if (window.gtag && !isAdmin()) window.gtag('event', 'page_view', { page_title: document.title, page_location: location.href, page_path: location.pathname + location.hash.replace('#', '') });
   let first = false; try { first = !sessionStorage.getItem('found_sess'); if (first) sessionStorage.setItem('found_sess', '1'); } catch {}
   if (first) logSite('visit', S.route);
   logSite('page', S.route);
@@ -734,7 +749,7 @@ function trackPage() {
 
 const tracked = new Set();
 function track(pid, kind) {
-  if (!pid || !api.track) return;
+  if (!pid || !api.track || !analyticsOK()) return;
   const k = pid + ':' + kind; if (tracked.has(k)) return; tracked.add(k);
   api.track(pid, kind, VISITOR);
 }
@@ -850,7 +865,8 @@ function renderNav() {
   links.push([S.user ? 'cuenta' : 'entrar', S.user ? 'Cuenta' : 'Entrar', ICON.user, 'dt']);
   const cur = n => (r === n || (n === 'cuenta' && r === 'gustos') || (n === 'marcas' && r === 'marca') || (n === 'entrar' && r === 'vender') || (n === 'panel' && r === 'mensajes' && !isAdmin())) ? ' aria-current="page"' : '';
   const curD = n => (n === 'panel' || n === 'mensajes') ? (r === n ? ' aria-current="page"' : '') : cur(n);
-  const cta = !isBrand() && !isAdmin() ? `<a class="cta" href="#/vender">Vende en ${esc(C.appName)}</a>` : '';
+  // v19 · una sola llamada a la acción: «Vende en FOUND» pasa a ser un enlace normal del menú
+  const cta = !isBrand() && !isAdmin() ? `<a href="#/vender"${cur('vender')}>Vende en ${esc(C.appName)}</a>` : '';
   // v4 · escaparate: fila 1 = logo, buscador y cuenta; fila 2 = secciones y categorías (solo en ordenador)
   const MAIN = ['descubrir', 'explorar', 'marcas', 'guardados'];
   const acts = links.filter(l => l[3].includes('d') && !MAIN.includes(l[0])).map(([n, l, , , x]) => `<a href="#/${n}"${curD(n)}>${l}${x || ''}</a>`).join('');
@@ -869,10 +885,11 @@ function renderFoot() {
   const ig = isUrl(C.instagram) ? `<li><a href="${esc(C.instagram)}" target="_blank" rel="noopener noreferrer">Instagram</a></li>` : '';
   $('#foot').innerHTML = `<div class="wrap"><div class="cols">
     <div><a class="logo" href="#/inicio">${esc(C.appName.slice(0, -1))}<b>${esc(C.appName.slice(-1))}</b></a><p>${T('foot.text', C.tagline + '. Marcas independientes y prendas elegidas según tu estilo.')}</p></div>
-    <div><h4>Comprar</h4><ul><li><a href="#/descubrir">Descubrir</a></li><li><a href="#/explorar">Explorar</a></li><li><a href="#/marcas">Marcas</a></li><li><a href="#/gustos">Test de estilo</a></li><li><a href="#/guardados">Guardados</a></li></ul></div>
-    <div><h4>Marcas</h4><ul><li><a href="#/vender">Vende en ${esc(C.appName)}</a></li>${isBrand() ? '<li><a href="#/panel">Mi panel</a></li>' : '<li><a href="#/vender">Crear cuenta de marca</a></li>'}</ul></div>
-    <div><h4>${esc(C.appName)}</h4><ul><li><a href="#/inicio">Cómo funciona</a></li>${contact}${ig}<li><a href="#/${S.user ? 'cuenta' : 'entrar'}">${S.user ? 'Mi cuenta' : 'Entrar'}</a></li></ul></div>
-  </div><div class="legal"><span>© ${year} ${esc(C.appName)}</span><span>${T('foot.legal', 'La compra se realiza en la tienda de cada marca.')}</span></div></div>`;
+    <div><h2 class="fh">Comprar</h2><ul><li><a href="#/descubrir">Descubrir</a></li><li><a href="#/explorar">Explorar</a></li><li><a href="#/marcas">Marcas</a></li><li><a href="#/gustos">Test de estilo</a></li><li><a href="#/guardados">Guardados</a></li></ul></div>
+    <div><h2 class="fh">Marcas</h2><ul><li><a href="#/vender">Vende en ${esc(C.appName)}</a></li>${isBrand() ? '<li><a href="#/panel">Mi panel</a></li>' : '<li><a href="#/vender">Crear cuenta de marca</a></li>'}</ul></div>
+    <div><h2 class="fh">${esc(C.appName)}</h2><ul><li><a href="#/vender">Cómo funciona</a></li>${contact}${ig}<li><a href="#/${S.user ? 'cuenta' : 'entrar'}">${S.user ? 'Mi cuenta' : 'Entrar'}</a></li></ul></div>
+  </div><div class="legal"><span>© ${year} ${esc(C.appName)}</span><span>${T('foot.legal', 'La compra se realiza en la tienda de cada marca.')}</span>
+    <nav class="legal-links" aria-label="Información legal"><a href="aviso-legal.html">Aviso legal</a><a href="privacidad.html">Privacidad</a><a href="cookies.html">Cookies</a><button type="button" class="linkbtn" data-ck="open">Configurar cookies</button></nav></div></div>`;
 }
 
 /* ==========================================================
@@ -959,9 +976,9 @@ VIEWS.inicio = () => {
         <h1>${T('home.title', 'La moda que encaja *contigo*.')}</h1>
         <p class="lead">${T('home.lead', 'Haz el test de estilo en un minuto y verás en cada prenda cuánto encaja contigo.')}</p>
         <div class="ctas">
-          <button class="btn" data-act="gustos">${hasTaste() ? 'Ajustar mis gustos' : T('home.cta1', 'Haz el test de estilo')}</button>
-          <a class="btn ghost" href="#/descubrir">${T('home.cta2', 'Descubrir prendas')}</a>
+          ${hasTaste() ? `<a class="btn" href="#/descubrir">${T('home.cta2', 'Ver mis prendas')} <span class="arr" aria-hidden="true">→</span></a>` : `<button class="btn" data-act="gustos">${T('home.cta1', 'Haz el test de estilo')} <span class="arr" aria-hidden="true">→</span></button>`}
         </div>
+        ${hasTaste() ? '<p class="cta-sub"><button class="linkbtn" data-act="gustos">Ajustar mis gustos</button></p>' : `<p class="cta-sub muted">${T('home.ctasub', 'Gratis · 1 minuto · sin registrarte')}</p>`}
       </div>
       <div class="hpics">${heroPics}</div>
     </section>
@@ -992,7 +1009,7 @@ VIEWS.inicio = () => {
     <section class="hsec">
       <div class="hband">
         <div><b>${T('band.title', '¿Tienes una marca? Publica en ' + C.appName + '.')}</b><span>${T('band.text', 'Los compradores con tu estilo te encuentran. La venta se hace en tu propia tienda.')}</span></div>
-        <div class="ctas"><button class="btn light" data-act="brandsignup">${T('band.cta1', 'Crear cuenta de marca')}</button><a class="btn ghost light2" href="#/vender">${T('band.cta2', 'Saber más')}</a></div>
+        <a class="bandlink" href="#/vender">${T('band.cta2', 'Saber más')} <span aria-hidden="true">→</span></a>
       </div>
     </section>
   </div>`;
@@ -1015,7 +1032,8 @@ VIEWS.vender = () => {
         <span class="eyebrow">${T('sell.eyebrow', 'Para marcas independientes')}</span>
         <h1>${T('sell.title', 'Tus prendas, delante de quien *ya* las busca.')}</h1>
         <p class="lead">${T('sell.lead', 'En ' + C.appName + ' los compradores nos dicen su estilo antes de empezar. Tú etiquetas tus prendas y nosotros las enseñamos a las personas con las que encajan.')}</p>
-        <div class="ctas"><button class="btn" data-act="brandsignup">${isBrand() ? 'Ir a mi panel' : 'Crear cuenta de marca'} <span class="arr">→</span></button><a class="btn ghost" href="#/marcas">Ver marcas</a></div>
+        <div class="ctas"><button class="btn" data-act="brandsignup">${isBrand() ? 'Ir a mi panel' : 'Crear cuenta de marca'} <span class="arr" aria-hidden="true">→</span></button></div>
+        <p class="cta-sub muted">${billingOn() ? 'Suscripción mensual · cancela cuando quieras' : 'Gratis · sin comisiones por venta'}</p>
       </div>
     </section></div>
     <section class="section tint"><div class="wrap">
@@ -1202,7 +1220,7 @@ VIEWS.marca = id => {
     : { name: 'Marca', color: '#141414' };
   const minP = list.length ? Math.min(...list.map(p => p.price)) : 0;
   view.innerHTML = `<div class="wrap page has-tabbar"><div class="brandhero${bo.cover ? ' hascover' : ''}" style="background:${bo.cover ? 'var(--deep)' : b ? softBg(b.color) : 'var(--soft)'}">
-    ${bo.cover ? `<img class="bh-cover" src="${esc(bo.cover)}" alt="">` : ''}${avatar(bo, true)}
+    ${bo.cover ? `<img class="bh-cover" src="${esc(bo.cover)}" alt="Portada de ${esc(bo.name)}">` : ''}${avatar(bo, true)}
     <div><h1>${esc(bo.name)}</h1>${bo.bio ? `<p>${esc(bo.bio)}</p>` : ''}
       ${list.length ? `<div class="kpis"><div><b>${list.length}</b>${list.length === 1 ? 'prenda' : 'prendas'}</div><div><b>${money(minP)}</b>desde</div></div>` : ''}</div>
     <div class="bh-acts">${bo.contact ? `<a class="btn ghost small" href="mailto:${esc(bo.contact)}">Contactar</a>` : ''}<button class="btn ghost small" data-act="share" data-v="m" data-id="${esc(id)}">${ICON.share} Compartir</button></div></div>
@@ -1229,6 +1247,46 @@ VIEWS.gustos = () => {
 };
 
 /* --- Entrar / registrarse --- */
+/* ==========================================================
+   v19 · PROTECCIÓN ANTISPAM DE LOS FORMULARIOS
+   1. Campo trampa invisible: las personas no lo ven; los robots lo rellenan y se les ignora.
+   2. Tiempo mínimo: un formulario enviado en menos de 2 segundos no lo ha escrito una persona.
+   3. Límite de intentos en este navegador (además de los límites de Supabase y de la base de datos).
+   4. Opcional: Cloudflare Turnstile (casilla «No soy un robot» casi invisible) si pones turnstileSiteKey en config.js.
+   ========================================================== */
+const honeypot = () => `<div class="hp" aria-hidden="true"><label>Deja este campo vacío<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>`;
+const formStamp = new WeakMap();
+const stampForm = f => { if (f) formStamp.set(f, Date.now()); };
+function looksLikeBot(form, minMs = 2000) {
+  const hp = form && form.querySelector('input[name="website"]');
+  if (hp && hp.value) return 'bot';
+  if (Date.now() - (formStamp.get(form) || 0) < minMs) return 'fast';
+  return '';
+}
+function tooManyTries(key, max, minutes) {
+  const now = Date.now(), k = 'found_rl_' + key;
+  let l = []; try { l = JSON.parse(sessionStorage.getItem(k) || '[]').filter(t => now - t < minutes * 6e4); } catch {}
+  if (l.length >= max) return true;
+  l.push(now); try { sessionStorage.setItem(k, JSON.stringify(l)); } catch {}
+  return false;
+}
+const TS = { loading: null, id: null, token: '' };
+const turnstileOn = () => !!(C.turnstileSiteKey && api.live);
+function loadTurnstile() {
+  if (!turnstileOn()) return Promise.resolve(false);
+  if (window.turnstile) return Promise.resolve(true);
+  if (!TS.loading) TS.loading = new Promise(res => { const sc = document.createElement('script'); sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'; sc.async = true; sc.onload = () => res(true); sc.onerror = () => res(false); document.head.appendChild(sc); });
+  return TS.loading;
+}
+async function mountTurnstile(boxId) {
+  TS.token = '';
+  if (!(await loadTurnstile())) return;
+  const box = document.getElementById(boxId); if (!box || !window.turnstile) return;
+  try { if (TS.id !== null) window.turnstile.remove(TS.id); } catch {}
+  TS.id = window.turnstile.render(box, { sitekey: C.turnstileSiteKey, language: 'es', theme: 'light', callback: t => { TS.token = t; }, 'expired-callback': () => { TS.token = ''; }, 'error-callback': () => { TS.token = ''; } });
+}
+const resetTurnstile = () => { TS.token = ''; try { if (window.turnstile && TS.id !== null) window.turnstile.reset(TS.id); } catch {} };
+
 VIEWS.entrar = () => {
   if (S.user) return go('cuenta');
   const up = S.authMode === 'up', brand = S.authRole === 'brand';
@@ -1248,12 +1306,18 @@ VIEWS.entrar = () => {
       ${up && brand ? '<label class="field"><span>Nombre de tu marca</span><input type="text" id="a-brand" maxlength="60" autocomplete="organization"></label>' : ''}
       <label class="field"><span>Correo</span><input type="email" id="a-email" autocomplete="email" required></label>
       <label class="field"><span>Contraseña${up ? ' (mínimo 6 caracteres)' : ''}</span><input type="password" id="a-pw" autocomplete="${up ? 'new-password' : 'current-password'}" required></label>
+      ${up ? `<label class="check terms"><input type="checkbox" id="a-terms" required> <span>He leído y acepto la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a> y el <a href="aviso-legal.html" target="_blank" rel="noopener">aviso legal</a>.</span></label>` : ''}
+      ${honeypot()}
+      ${turnstileOn() ? '<div class="ts-box" id="ts-box"></div>' : ''}
       <p class="msg" id="amsg" role="alert"></p>
       <button class="btn block" type="submit" id="asend">${up ? 'Crear cuenta' : 'Entrar'}</button>
+      ${up ? `<p class="fine">Responsable: ${esc((C.legal && C.legal.owner && !/^\[/.test(C.legal.owner)) ? C.legal.owner : C.appName)}. Usamos tus datos para gestionar tu cuenta. Puedes acceder, corregir o borrar tus datos cuando quieras. Más información en la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a>.</p>` : ''}
     </form>
     ${api.live ? '' : '<p class="muted" style="margin-top:14px;font-size:14px">Modo demo: la cuenta se guarda solo en este navegador y la contraseña no se comprueba.</p>'}
   </div></div></div></div>`;
   $('#authForm').addEventListener('submit', onAuthSubmit);
+  stampForm($('#authForm'));
+  if (turnstileOn()) mountTurnstile('ts-box');
 };
 async function onAuthSubmit(e) {
   e.preventDefault();
@@ -1263,10 +1327,17 @@ async function onAuthSubmit(e) {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { m.classList.add('err'); m.textContent = 'Escribe un correo válido, por ejemplo tu@correo.com.'; return; }
   if (pw.length < 6 && (up || api.live)) { m.classList.add('err'); m.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
   if (up && brand && !brandName) { m.classList.add('err'); m.textContent = 'Escribe el nombre de tu marca.'; return; }
+  if (up && !$('#a-terms').checked) { m.classList.add('err'); m.textContent = 'Para crear la cuenta tienes que aceptar la política de privacidad.'; return; }
+  const bot = looksLikeBot(e.target, up ? 2500 : 1200);
+  if (bot === 'bot') { m.classList.add('ok'); m.textContent = up ? 'Cuenta creada. Revisa tu correo para confirmarla y luego entra.' : 'Un momento…'; return; }
+  if (bot === 'fast') { m.classList.add('err'); m.textContent = 'Vas muy rápido. Espera un segundo y vuelve a pulsar.'; return; }
+  if (tooManyTries(up ? 'signup' : 'signin', up ? 4 : 8, 10)) { m.classList.add('err'); m.textContent = 'Demasiados intentos seguidos. Espera unos minutos y vuelve a probar.'; return; }
+  if (turnstileOn() && !TS.token) { m.classList.add('err'); m.textContent = 'Espera a que se complete la comprobación de seguridad (el recuadro de arriba) y vuelve a pulsar.'; return; }
   btn.disabled = true; btn.textContent = 'Un momento…';
+  const captchaToken = TS.token || undefined;
   try {
     if (up) {
-      const r = await api.signUp({ email, password: pw, role: brand ? 'brand' : 'buyer', brandName });
+      const r = await api.signUp({ email, password: pw, role: brand ? 'brand' : 'buyer', brandName, captchaToken });
       logSite('signup', brand ? 'marca' : 'comprador');
       if (r.needsConfirm) {
         if (brand && billingOn()) {
@@ -1279,13 +1350,14 @@ async function onAuthSubmit(e) {
         }
         m.classList.add('ok'); m.textContent = 'Cuenta creada. Revisa tu correo para confirmarla y luego entra.'; btn.disabled = false; btn.textContent = 'Crear cuenta'; return;
       }
-    } else await api.signIn({ email, password: pw });
+    } else await api.signIn({ email, password: pw, captchaToken });
     await afterAuth(); await refreshProducts();
     toast(up ? '¡Bienvenido a ' + C.appName + '!' : 'Has entrado');
     go(isBrand() ? 'panel' : (hasTaste() ? 'descubrir' : 'gustos'));
   } catch (err) {
     m.classList.add('err'); m.textContent = traduce(err.message);
     btn.disabled = false; btn.textContent = up ? 'Crear cuenta' : 'Entrar';
+    resetTurnstile();
   }
 }
 function traduce(msg) {
@@ -1294,6 +1366,7 @@ function traduce(msg) {
   if (/already registered|already been registered/i.test(t)) return 'Ya existe una cuenta con ese correo.';
   if (/email not confirmed/i.test(t)) return 'Aún no has confirmado tu correo. Revisa tu bandeja de entrada.';
   if (/rate limit/i.test(t)) return 'Demasiados intentos. Espera un momento y vuelve a probar.';
+  if (/captcha/i.test(t)) return 'No se pudo completar la comprobación de seguridad. Recarga la página y vuelve a probar.';
   if (/FOUND_EMAIL_BLOQUEADO|Database error saving new user/i.test(t)) return 'No se puede crear una cuenta con este correo. Si crees que es un error, escríbenos.';
   return t;
 }
@@ -2283,6 +2356,7 @@ function openProduct(id) {
     </div></div>
     ${related.length ? `<div class="related"><h3>También te puede gustar</h3><div class="rgrid">${related.map(r => `<button data-act="open" data-id="${esc(r.id)}" aria-label="Ver ${esc(r.name)}"><span class="rt" style="background:${tileBg(r)}">${pic(r)}</span><span class="rn">${esc(r.name)}</span><span class="rp">${money(r.price)}</span></button>`).join('')}</div></div>` : ''}</div>`;
   if (!dlg.open) dlg.showModal(); else dlg.scrollTop = 0;
+  setMeta(`${p.name} de ${p.brand}`, p.desc || `${p.name} de ${p.brand} por ${money(p.price)}. ${p.tags.join(', ')}.`, { ld: productLD(p) });
   initGallery();
 }
 /* galería de la ficha: se desliza con el dedo; en el ordenador, con flechas y miniaturas */
@@ -2308,6 +2382,7 @@ function galGo(d, abs) {
   t.scrollTo({ left: Math.max(0, i) * t.clientWidth, behavior: reduceMotion ? 'auto' : 'smooth' });
 }
 dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+dlg.addEventListener('close', () => { if (S.route) routeMeta(S.route, (location.hash.split('/')[2] || '')); });
 
 /* ---------- denunciar una prenda ---------- */
 function openReportForm(id) {
@@ -2315,14 +2390,20 @@ function openReportForm(id) {
   box.innerHTML = `<form class="repform" onsubmit="return false"><b>¿Qué pasa con esta prenda?</b>
     ${Object.entries(REPORT_REASONS).map(([k, l], i) => `<label class="rrow"><input type="radio" name="rreason" value="${k}"${i === 0 ? ' checked' : ''}> <span>${esc(l)}</span></label>`).join('')}
     <label class="field" style="margin:8px 0 10px"><span>Cuéntanos algo más (opcional)</span><textarea id="rdetails" maxlength="500" placeholder="Ej. Es una copia de la marca X"></textarea></label>
+    ${honeypot()}
     <p class="msg" id="rmsg" role="alert"></p>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" data-act="sendreport" data-id="${esc(id)}">Enviar aviso</button><button type="button" class="btn ghost small" data-act="open" data-id="${esc(id)}">Cancelar</button></div>
     <small class="muted">Lo revisamos y, si incumple las normas, la retiramos. No le decimos a la marca quién ha avisado.</small></form>`;
+  stampForm(box.querySelector('form'));
   box.querySelector('input').focus();
 }
 async function sendReport(id, btn) {
   const reason = ($('input[name="rreason"]:checked') || {}).value, details = ($('#rdetails') || {}).value || '';
-  const m = $('#rmsg'); btn.disabled = true; btn.textContent = 'Enviando…';
+  const m = $('#rmsg'), form = btn.closest('form'), bot = looksLikeBot(form, 1500);
+  if (bot === 'bot') { $('#repbox').innerHTML = '<p class="repdone">Gracias por avisar. Lo revisaremos pronto.</p>'; return; }
+  if (bot === 'fast') { m.className = 'msg err'; m.textContent = 'Espera un segundo y vuelve a pulsar.'; return; }
+  if (tooManyTries('report', 5, 60)) { m.className = 'msg err'; m.textContent = 'Has enviado varios avisos seguidos. Prueba de nuevo más tarde.'; return; }
+  btn.disabled = true; btn.textContent = 'Enviando…';
   try { await api.reportProduct(id, reason, details.trim()); $('#repbox').innerHTML = '<p class="repdone">Gracias por avisar. Lo revisaremos pronto.</p>'; }
   catch (e) { m.className = 'msg err'; m.textContent = e.message; btn.disabled = false; btn.textContent = 'Enviar aviso'; }
 }
@@ -2523,12 +2604,103 @@ document.addEventListener('keydown', e => {
 });
 
 /* ==========================================================
+   v19 · SEO: título y descripción de cada pantalla, noindex en las privadas
+   y datos estructurados (schema.org) de cada prenda y marca
+   ========================================================== */
+const SITE_URL = (isUrl(C.siteUrl) && !/TU-USUARIO/i.test(C.siteUrl)) ? C.siteUrl.replace(/\/?$/, '/') : baseUrlNow();
+function baseUrlNow() { return location.href.split(/[?#]/)[0]; }
+const DEF_DESC = 'Descubre prendas de marcas independientes elegidas según tu estilo y tu talla. Haz el test de estilo en un minuto y compra directamente en la tienda de cada marca.';
+const PRIVATE_ROUTES = ['entrar', 'cuenta', 'panel', 'admin', 'mensajes', 'pago', 'guardados', '404'];
+function metaTag(attr, key) {
+  let m = document.head.querySelector(`meta[${attr}="${key}"]`);
+  if (!m) { m = document.createElement('meta'); m.setAttribute(attr, key); document.head.appendChild(m); }
+  return m;
+}
+function setMeta(title, desc, opts = {}) {
+  const t = title ? title + ' · ' + C.appName : C.appName + ' · Marketplace de moda independiente que encaja con tu estilo';
+  document.title = t;
+  const d = String(desc || DEF_DESC).replace(/\s+/g, ' ').trim().slice(0, 158);
+  metaTag('name', 'description').content = d;
+  metaTag('property', 'og:title').content = t;
+  metaTag('property', 'og:description').content = d;
+  metaTag('name', 'robots').content = opts.noindex ? 'noindex, follow' : 'index, follow, max-image-preview:large';
+  setLD(opts.ld || null);
+}
+function setLD(obj) {
+  let el = document.getElementById('ld-page');
+  if (!obj) { if (el) el.remove(); return; }
+  if (!el) { el = document.createElement('script'); el.type = 'application/ld+json'; el.id = 'ld-page'; document.head.appendChild(el); }
+  el.textContent = JSON.stringify({ '@context': 'https://schema.org', ...obj });
+}
+const absUrl = u => { try { return new URL(u, SITE_URL).href; } catch { return ''; } };
+function productLD(p) {
+  return {
+    '@type': 'Product', name: p.name, description: p.desc || `${p.name} de ${p.brand}`, category: p.cat,
+    image: p.images.length ? p.images.filter(u => !u.startsWith('data:')).map(absUrl) : [absUrl('og.png')],
+    brand: { '@type': 'Brand', name: p.brand },
+    ...(p.sizes.length ? { size: p.sizes.join(', ') } : {}),
+    offers: { '@type': 'Offer', price: Number(p.price).toFixed(2), priceCurrency: 'EUR', availability: 'https://schema.org/InStock', url: SITE_URL + '?p=' + encodeURIComponent(p.id), ...(isUrl(p.buy_url) ? { seller: { '@type': 'Organization', name: p.brand } } : {}) }
+  };
+}
+function routeMeta(name, arg) {
+  const cat = S.cat && S.cat !== 'Todo' ? S.cat : '';
+  switch (name) {
+    case 'inicio': return setMeta('', DEF_DESC, { ld: S.products.length ? { '@type': 'ItemList', name: 'Prendas destacadas', itemListElement: ranked(S.products).slice(0, 10).map((p, i) => ({ '@type': 'ListItem', position: i + 1, item: productLD(p) })) } : null });
+    case 'descubrir': return setMeta('Descubrir prendas para ti', 'Desliza y descubre prendas de marcas independientes ordenadas según tu estilo, tu talla y tu presupuesto.');
+    case 'explorar': return setMeta(cat ? cat + ' de marcas independientes' : 'Explorar ropa de marcas independientes', `Busca y filtra ${cat ? cat.toLowerCase() : 'camisetas, vestidos, chaquetas, pantalones, calzado y complementos'} de marcas independientes por estilo, talla y precio.`);
+    case 'marcas': return setMeta('Marcas de moda independientes', 'Directorio de marcas de moda independientes en ' + C.appName + ': conoce a cada marca y mira sus prendas.');
+    case 'marca': {
+      const b = brandList().find(x => x.id === arg);
+      if (!b) return setMeta('Marca', 'Marca de moda independiente en ' + C.appName + '.');
+      return setMeta(b.name + ': prendas y tienda', b.bio || `Descubre las ${b.items.length} prendas de ${b.name} en ${C.appName}.`, { ld: { '@type': 'Brand', name: b.name, url: SITE_URL + '?m=' + encodeURIComponent(b.id), ...(b.logo && !b.logo.startsWith('data:') ? { logo: b.logo } : {}), ...(b.bio ? { description: b.bio } : {}) } });
+    }
+    case 'vender': return setMeta('Vende tu marca de ropa', 'Publica las prendas de tu marca y llega a compradores con tu estilo. La venta se hace en tu propia tienda, sin comisiones.');
+    case 'gustos': return setMeta('Test de estilo', 'Responde en un minuto y verás en cada prenda cuánto encaja contigo: estilo, categorías, presupuesto y talla.');
+    case 'guardados': return setMeta('Tus guardados', 'Las prendas que has guardado en ' + C.appName + '.', { noindex: true });
+    case 'entrar': return setMeta('Entrar o crear cuenta', 'Entra en ' + C.appName + ' o crea tu cuenta de comprador o de marca.', { noindex: true });
+    case '404': return setMeta('Página no encontrada', 'La página que buscas no existe o se ha movido.', { noindex: true });
+    default: return setMeta(PAGE_NAMES[name] || '', '', { noindex: PRIVATE_ROUTES.includes(name) });
+  }
+}
+
+/* --- 404 dentro de la web (enlaces antiguos o mal escritos) --- */
+VIEWS['404'] = () => {
+  view.innerHTML = `<div class="wrap page has-tabbar"><section class="nf">
+    <span class="nf-code" aria-hidden="true">404</span>
+    <h1>Esta página se nos ha <em>descosido</em>.</h1>
+    <p class="lead muted">El enlace no existe o la prenda ya no está disponible. Busca otra cosa o vuelve al inicio.</p>
+    <form class="nf-search" role="search" data-nf><label class="sr" for="nfq">Buscar prendas</label><input id="nfq" type="search" placeholder="Busca prendas, marcas o estilos" autocomplete="off"><button class="btn" type="submit">Buscar</button></form>
+    <p><a href="#/inicio">Volver al inicio</a></p></section></div>`;
+};
+document.addEventListener('submit', e => {
+  if (!e.target.matches('[data-nf]')) return;
+  e.preventDefault(); S.q = $('#nfq').value; S.cat = 'Todo'; S.style = 'Todos'; go('explorar');
+});
+
+/* --- botón flotante de WhatsApp --- */
+function renderWhatsApp() {
+  const n = String(C.whatsapp || '').replace(/\D/g, '');
+  let b = $('#wa');
+  // en Descubrir no se muestra: taparía los botones de Guardar, Compartir y Comprar
+  const hide = !n || S.route === 'admin' || S.route === 'mensajes' || S.route === 'descubrir' || S.editMode;
+  if (hide) { if (b) b.remove(); return; }
+  if (!b) { b = document.createElement('a'); b.id = 'wa'; b.className = 'wa'; b.target = '_blank'; b.rel = 'noopener noreferrer'; document.body.appendChild(b); }
+  b.href = 'https://wa.me/' + n + '?text=' + encodeURIComponent(C.whatsappText || 'Hola');
+  b.setAttribute('aria-label', 'Escríbenos por WhatsApp (se abre en una pestaña nueva)');
+  b.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true"><path fill="currentColor" d="M16 3a13 13 0 0 0-11.2 19.6L3 29l6.6-1.7A13 13 0 1 0 16 3zm0 23.6c-2 0-4-.5-5.7-1.6l-.4-.2-3.9 1 1-3.8-.3-.4A10.6 10.6 0 1 1 16 26.6zm5.8-7.9c-.3-.2-1.9-.9-2.2-1-.3-.1-.5-.2-.7.2l-1 1.2c-.2.2-.4.2-.7.1a8.7 8.7 0 0 1-4.3-3.8c-.3-.5.3-.5.9-1.6.1-.2 0-.4 0-.5l-1-2.4c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.2.2 2.1 3.3 5.2 4.6 1.9.8 2.7.9 3.6.7.6-.1 1.9-.8 2.1-1.5.3-.7.3-1.4.2-1.5-.1-.2-.3-.2-.6-.4z"/></svg><span>WhatsApp</span>';
+  b.classList.toggle('up', isAdmin());
+  b.onclick = () => logSite('whatsapp');
+}
+
+/* ==========================================================
    ENRUTADOR E INICIO
    ========================================================== */
 function route() {
-  const h = location.hash.replace(/^#\/?/, '') || 'inicio';
-  const [name, arg] = h.split('/');
-  S.route = VIEWS[name] ? name : 'inicio';
+  // anclas internas (por ejemplo «Saltar al contenido») no cambian de pantalla
+  if (location.hash && !/^#\//.test(location.hash) && S.route) return;
+  const h = /^#\//.test(location.hash) ? location.hash.slice(2) : '';
+  const [name, arg] = (h || 'inicio').split('/');
+  S.route = VIEWS[name] && name !== '404' ? name : (h ? '404' : 'inicio');
   document.body.classList.remove('noscroll');
   if (S.route !== 'explorar') { S.q = ''; S.style = 'Todos'; }
   if (dlg.open) dlg.close();
@@ -2536,7 +2708,9 @@ function route() {
   if (S.route !== 'panel') { S.editing = null; if (S.route !== 'gustos') { S.formTags = []; S.formSizes = []; clearPhotos(); } }
   renderNav();
   VIEWS[S.route](arg);
+  routeMeta(S.route, arg);
   renderEditBar();
+  renderWhatsApp();
   trackPage();
   if (S.route !== 'descubrir') window.scrollTo(0, 0);
 }
@@ -2554,7 +2728,8 @@ document.addEventListener('submit', e => {
 (async function start() {
   if (/[?&]pago=/.test(location.search)) history.replaceState(null, '', location.pathname + '#/pago');
   // enlaces compartidos: ?p=ID abre la prenda, ?m=ID abre la página de la marca
-  const qs = new URLSearchParams(location.search), sharedP = qs.get('p'), sharedM = qs.get('m');
+  const qs = new URLSearchParams(location.search), sharedP = qs.get('p'), sharedM = qs.get('m'), sharedQ = qs.get('q');
+  if (sharedQ && !sharedP && !sharedM) { S.q = sharedQ.slice(0, 80); history.replaceState(null, '', location.pathname + '#/explorar'); }
   if (sharedP || sharedM) history.replaceState(null, '', location.pathname + (sharedM ? '#/marca/' + encodeURIComponent(sharedM) : (location.hash || '#/inicio')));
   if (configured && !hasLib) toast('No se pudo cargar Supabase. Revisa tu conexión y recarga la página.');
   try { await afterAuth(); } catch (e) { S.favs = guestFavs(); toast('No se pudo comprobar tu sesión: ' + e.message); }

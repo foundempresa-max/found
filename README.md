@@ -25,6 +25,14 @@ de datos gratuita en Supabase.
 | `supabase/mensajes.sql` | Mensajes entre las marcas y tú (chat interno) |
 | `supabase/fotos.sql` | Hasta 5 fotos por prenda |
 | `og.png` | Imagen que sale al compartir un enlace de la web |
+| `aviso-legal.html`, `privacidad.html`, `cookies.html` | Páginas legales. Se rellenan solas con los datos de `legal` en `config.js` |
+| `consent.js` | Aviso de cookies (Aceptar / Rechazar / Configurar) |
+| `legal.js` | Pone tus datos en las páginas legales |
+| `404.html` | Página de «no encontrada» que enseña GitHub Pages |
+| `robots.txt`, `sitemap.xml` | Para Google (cambia `TU-USUARIO` dentro) |
+| `favicon.svg`, `favicon.ico`, `favicon-32.png`, `apple-touch-icon.png`, `icon-*.png`, `site.webmanifest` | Iconos de la pestaña, del móvil y de «Añadir a pantalla de inicio» |
+| `fonts/` | La letra Hanken Grotesk, servida desde tu web (más rápida, sin Google Fonts) |
+| `vendor/` | La librería de Supabase, servida desde tu web (sin depender de otro servidor) |
 | `.nojekyll` | Archivo vacío que necesita GitHub Pages para publicar la web tal cual (no lo borres) |
 | `supabase/mas-adelante-cobro/` | Cobro a marcas con Stripe, **apagado** (ver el final de este archivo) |
 
@@ -226,6 +234,66 @@ No hay que ejecutar nada en Supabase: basta con subir los archivos nuevos a GitH
   tienen ahora una zona de toque de 44 px, sin cambiar cómo se ven.
 - Todo está al final de `style.css`, desde la línea `v18 · PULIDO MÓVIL`.
 
+## 2q. Lo legal, SEO, velocidad y antispam (v19)
+No hay que ejecutar nada en Supabase. Sube **todos** los archivos (también las carpetas `fonts/` y `vendor/`).
+
+**Antes de abrir la web al público, rellena en `config.js` (busca «RELLENAR»):**
+- `siteUrl`: la dirección de tu web.
+- `contactEmail`: tu correo (sale en el pie y es el contacto para temas de privacidad).
+- `legal`: tu nombre o razón social, NIF, dirección y, si eres sociedad, los datos del Registro Mercantil. Mientras falten,
+  las páginas legales los enseñan en amarillo como «[pendiente de completar]».
+- `whatsapp`: tu número con prefijo, sin + ni espacios (`34600111222`). Vacío = sin botón.
+- `supabaseRegion`: la región de tu proyecto (Supabase > Project Settings > General).
+
+**Cambia `TU-USUARIO`** por tu usuario de GitHub (o pon tu dominio) en `index.html`, `robots.txt`, `sitemap.xml`
+y en las líneas `canonical` de `aviso-legal.html`, `privacidad.html` y `cookies.html`. Un «Buscar y reemplazar» en cada archivo lo hace en un momento.
+
+**Qué incluye:**
+- **Aviso legal, privacidad y cookies** (LSSI-CE, RGPD/LOPDGDD y Guía de cookies de la AEPD de 2023). Enlazados en el pie y en el registro,
+  con una casilla obligatoria de «He leído y acepto la política de privacidad». Son un buen punto de partida, pero
+  **que los revise un abogado o asesor**, sobre todo si cambias cómo funciona la web o activas el cobro.
+- **Aviso de cookies**: Aceptar, Rechazar y Configurar con el mismo aspecto. Hasta que la persona acepta, **no se cuenta nada**
+  (ni visitas, ni clics de prendas, ni Google Analytics). Por eso, a partir de ahora tus estadísticas solo incluyen a quien acepta:
+  verás números más bajos que antes. Es lo que exige la ley. «Configurar cookies» en el pie permite cambiar de opinión.
+- **HTTPS forzado**: la web pasa sola de http:// a https://. Activa también **Settings > Pages > Enforce HTTPS** en GitHub.
+- **SEO**: título y descripción propios en cada pantalla, las privadas (cuenta, panel, guardados…) marcadas para que Google no las indexe,
+  datos estructurados de FOUND, del buscador, de cada prenda (nombre, precio, marca, tallas) y de cada marca, `sitemap.xml` y `robots.txt`.
+  Ahora también funciona `tuweb/?q=vestido`, que abre Explorar con esa búsqueda.
+- **Favicon** nuevo en todos los tamaños (pestaña, iPhone, Android).
+- **Imágenes**: las fotos de las prendas se suben en WebP (pesan alrededor de un 30 % menos) si el navegador sabe crearlas; si no, en JPG.
+  Todas las fotos tienen texto alternativo («Nombre de la prenda de Marca») y cargan solo cuando aparecen en pantalla. `og.png` pesa ahora 22 KB (antes 70 KB).
+- **Velocidad**: la letra y la librería de Supabase se sirven desde tu web, los scripts no bloquean la carga y no hay saltos al cargar.
+  En la prueba de Google Lighthouse (móvil, modo demo): 100 en rendimiento, accesibilidad, buenas prácticas y SEO.
+- **Contraste y accesibilidad**: textos grises más oscuros (cumplen WCAG AA), enlace «Saltar al contenido» y títulos en orden.
+- **Página 404** propia, dentro de la web (enlaces mal escritos) y para GitHub Pages (`404.html`).
+- **Enlaces rotos**: revisados todos los enlaces internos. «Cómo funciona» del pie, que llevaba al inicio, lleva ahora a «Vende en FOUND».
+- **Antispam** en el registro, el acceso y las denuncias: campo trampa invisible, tiempo mínimo para enviar y límite de intentos.
+  Funciona sin hacer nada.
+- **Botón de WhatsApp** abajo a la derecha (en el móvil, solo el icono). No sale en Descubrir, para no tapar los botones de cada prenda.
+- **Una sola llamada a la acción**: en la portada, solo «Haz el test de estilo» (o «Ver mis prendas» si ya lo hizo). «Vende en FOUND»
+  pasa a ser un enlace normal del menú, y la franja para marcas lleva a «Vende en FOUND», donde el único botón es «Crear cuenta de marca».
+
+**Antispam más fuerte (opcional, gratis): Cloudflare Turnstile**
+1. Crea una cuenta en https://dash.cloudflare.com > Turnstile > *Add widget*. Dominio: el de tu web (por ejemplo `tu-usuario.github.io`). Modo: *Managed*.
+2. Copia la **Site Key** en `turnstileSiteKey` de `config.js` y sube el archivo.
+3. En Supabase > Authentication > *Attack Protection* activa **Enable Captcha protection**, elige *Turnstile* y pega la **Secret Key**.
+   ⚠️ Haz los pasos 2 y 3 a la vez: si activas el paso 3 sin el 2, nadie podrá registrarse ni entrar.
+
+**Analítica**
+- Tus estadísticas de siempre siguen en *Creador > Visitas*.
+- **Google Analytics 4 (opcional):** crea una propiedad en https://analytics.google.com, copia el ID de medición (`G-…`) en `gaId` de `config.js`.
+  Solo se carga si la persona acepta la analítica, y ya aparece en la política de cookies.
+
+**Google**
+1. **Search Console** (https://search.google.com/search-console): añade tu web como *Prefijo de URL*, verifícala con la etiqueta HTML
+   (pégala donde indica el comentario de `index.html`) y envía `sitemap.xml` en *Sitemaps*. Así Google sabe que existes y te avisa de errores.
+2. **Ficha de Google (Google Business Profile):** Google **no la permite para negocios solo online** como FOUND. Solo podrías tenerla si
+   tienes un local o una tienda física donde atiendes en persona; si algún día la tienes, créala en https://business.google.com con esa dirección.
+   Mientras tanto, los datos estructurados de `index.html` ya le dicen a Google quién eres. Cuando tengas Instagram o TikTok,
+   pon sus enlaces entre los corchetes de `"sameAs": []` (por ejemplo `"sameAs": ["https://instagram.com/found"]`).
+3. `robots.txt` solo lo lee Google si está en la raíz del dominio: con `tu-usuario.github.io/found/` no se usa (no pasa nada).
+   Con dominio propio sí funciona.
+
 ## 3. Publicarlo en internet con GitHub Pages (gratis)
 La web vive en GitHub y los datos siguen en Supabase. En los pasos, cambia `tu-usuario` por tu usuario de GitHub.
 
@@ -284,8 +352,7 @@ comprar") o escribiéndole por correo. **No hay pagos dentro de FOUND.**
 2. **Moderación**: revisar marcas y productos antes de publicarlos.
 3. **Carrito y pedidos** dentro de la plataforma.
 4. **Vídeo corto por producto** en el feed.
-5. Aviso legal, política de privacidad y de cookies (obligatorio para operar
-   en la UE con usuarios reales).
+5. Revisión de los textos legales por un abogado o asesor.
 
 ## Para más adelante: cobrar a las marcas (suscripción mensual con Stripe)
 Ahora mismo el cobro está **apagado**: las marcas se registran y publican gratis y no ven nada de pagos.

@@ -1,3 +1,6 @@
+/* v19 · letra servida desde la propia web (más rápida y sin enviar datos a Google) */
+@font-face{font-family:'Hanken Grotesk';font-style:normal;font-weight:400 800;font-display:optional;src:url(fonts/hanken-grotesk-latin-wght-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Hanken Grotesk';font-style:italic;font-weight:400 600;font-display:optional;src:url(fonts/hanken-grotesk-latin-wght-italic.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 /* ==========================================================
    FOUND · estilos (v3 · etiqueta de ropa)
    Cambia la identidad visual editando las variables de :root.
@@ -176,7 +179,7 @@ p{margin:0}
 .foot .logo{font-size:44px;color:var(--deep-ink)}
 .foot .logo b,.auth-side h2 em,.band li::before,.auth-side li::before{color:var(--accent-on-deep)}
 .foot p{opacity:.65;margin-top:12px;max-width:34ch;font-size:15px}
-.foot h4{margin:0 0 14px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.55}
+.foot h4,.foot .fh{margin:0 0 14px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:.55}
 .foot ul{list-style:none;padding:0;margin:0;display:grid;gap:9px}
 .foot a{text-decoration:none;opacity:.88}
 .foot a:hover{opacity:1;text-decoration:underline}
@@ -698,7 +701,7 @@ h1 em,h2 em{font-style:normal;color:inherit;text-decoration:underline dashed var
 /* pie */
 .foot{border-top:0}
 .foot .logo{font-size:40px}
-.foot h4{text-transform:none;letter-spacing:.02em;font-stretch:90%;font-size:13px;opacity:.6}
+.foot h4,.foot .fh{text-transform:none;letter-spacing:.02em;font-stretch:90%;font-size:13px;opacity:.6}
 .foot .legal{border-top:1.5px dashed color-mix(in srgb,var(--deep-ink) 20%,transparent)}
 
 /* página de marca */
@@ -1163,7 +1166,7 @@ button.hpic:hover img,button.hpic:hover svg{transform:scale(1.04)}
 .foot{background:var(--surface);color:var(--ink);border-top:1px solid var(--line)}
 .foot .logo{font-size:20px;color:var(--ink)}
 .foot .logo b{color:inherit}
-.foot h4{opacity:.6;font-weight:600}
+.foot h4,.foot .fh{opacity:.6;font-weight:600}
 .foot .legal{border-top:1px solid var(--line)}
 .info .n{font-family:var(--body);font-weight:600;font-stretch:100%;text-transform:none;font-size:22px;line-height:1.15;letter-spacing:-.01em}
 .dinfo h2{line-height:1.08}
@@ -1284,3 +1287,105 @@ dialog{border-radius:12px}
   .pitem .acts>:last-child:nth-child(odd){grid-column:1/-1}
   .pitem .acts [data-act="admindel"],.pitem .acts [data-act="del"]{color:var(--danger);border-color:color-mix(in srgb,var(--danger) 45%,var(--line))}
 }
+
+/* ==========================================================
+   v19 · LEGAL, COOKIES, WHATSAPP, 404, ANTISPAM Y CONTRASTE
+   ========================================================== */
+/* saltar al contenido (teclado y lectores de pantalla) */
+.skip{position:absolute;left:12px;top:-60px;z-index:200;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:700;text-decoration:none}
+.skip:focus{top:12px}
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;left:auto}
+
+/* una sola llamada a la acción */
+.cta-sub{margin-top:12px;font-size:14px}
+.bandlink{color:var(--deep-ink);font-weight:700;text-decoration:underline;text-underline-offset:4px;padding:10px 0;white-space:nowrap}
+
+/* contraste: textos secundarios un poco más oscuros (AA ≥ 4,5:1 sobre fondo y tarjetas) */
+:root:not([data-theme="dark"]){--muted:#5A5A54}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--muted:#B0AFA7}}
+
+/* pie: enlaces legales */
+.foot .legal{flex-wrap:wrap;row-gap:10px;opacity:1;color:var(--muted)}
+.legal-links{display:flex;flex-wrap:wrap;gap:4px 18px;width:100%}
+.legal-links a,.legal-links .linkbtn{color:inherit;font-weight:500;font-size:14px;text-decoration:underline;text-underline-offset:3px}
+@media (pointer:coarse){.legal-links a,.legal-links .linkbtn{padding-block:11px;margin-block:-11px}}
+
+/* formulario: casilla de privacidad, letra pequeña y campo trampa */
+.check.terms{align-items:flex-start;font-weight:400;font-size:14px;line-height:1.45;margin:4px 0 14px}
+.check.terms input{flex:none;margin-top:1px}
+.check.terms a{color:var(--accent);font-weight:600}
+.fine{font-size:12.5px;line-height:1.5;color:var(--muted);margin-top:14px}
+.fine a{color:inherit}
+.hp{position:absolute!important;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}
+.ts-box{min-height:66px;margin:0 0 12px}
+
+/* aviso de cookies */
+.ck-banner{position:fixed;left:12px;right:12px;bottom:calc(12px + var(--tab-h) + env(safe-area-inset-bottom,0px));z-index:120;display:flex;justify-content:center;pointer-events:none}
+.ck-in{pointer-events:auto;width:min(980px,100%);background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 18px 50px -12px rgba(0,0,0,.35);padding:18px 20px;display:flex;gap:16px 24px;align-items:center;flex-wrap:wrap}
+.ck-in p{flex:1 1 380px;font-size:14.5px;line-height:1.5;margin:0}
+.ck-in a{color:var(--accent);font-weight:600}
+.ck-btns{display:flex;gap:8px;flex-wrap:wrap}
+/* los tres botones con el mismo aspecto: rechazar es tan fácil como aceptar */
+.ck-btn{min-height:44px;padding:10px 20px;border-radius:999px;border:1.5px solid var(--ink);background:var(--ink);color:var(--bg);font-weight:700;font-size:15px;flex:1 1 auto}
+.ck-btn:hover{filter:brightness(1.15)}
+body.has-ck .wa,body.has-ck .editfab{opacity:0;pointer-events:none}
+.ck-panel{border:0;border-radius:16px;padding:0;width:min(560px,calc(100% - 24px));background:var(--surface);color:var(--ink);box-shadow:0 30px 80px -20px rgba(0,0,0,.45)}
+.ck-panel::backdrop{background:rgba(20,20,18,.45)}
+.ck-form{padding:24px;display:grid;gap:14px}
+.ck-form h2{font-size:26px}
+.ck-muted{color:var(--muted);font-size:14.5px}
+.ck-row{display:flex;gap:16px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:12px;padding:14px 16px;cursor:default}
+label.ck-row{cursor:pointer}
+.ck-row b{display:block;margin-bottom:2px}
+.ck-row span{display:block;font-size:13.5px;color:var(--muted);line-height:1.45}
+.ck-always{flex:none;font-size:13px!important;font-weight:700;color:var(--accent)!important}
+.ck-switch{flex:none;appearance:none;-webkit-appearance:none;width:48px;height:28px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;transition:background .15s;border:1.5px solid color-mix(in srgb,var(--ink) 30%,transparent)}
+.ck-switch::after{content:"";position:absolute;top:2px;left:2px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .15s}
+.ck-switch:checked{background:var(--accent);border-color:var(--accent)}
+.ck-switch:checked::after{transform:translateX(20px)}
+.ck-link{font-size:14px;color:var(--accent);justify-self:start}
+@media (max-width:560px){.ck-in{padding:16px}.ck-btns{width:100%}.ck-btn{flex:1 1 30%;padding:10px 8px;font-size:14px}}
+
+/* botón flotante de WhatsApp */
+.wa{position:fixed;right:16px;bottom:calc(16px + var(--tab-h) + env(safe-area-inset-bottom,0px));z-index:55;display:inline-flex;align-items:center;gap:8px;height:52px;padding:0 18px 0 14px;border-radius:999px;background:#0B6E4F;color:#fff;text-decoration:none;font-weight:700;box-shadow:0 10px 26px -8px rgba(0,0,0,.4);transition:transform .15s}
+.wa:hover{transform:translateY(-2px)}
+.wa svg{width:26px;height:26px}
+.wa.up{bottom:calc(80px + var(--tab-h) + env(safe-area-inset-bottom,0px))}
+@media (max-width:820px){.wa{width:52px;padding:0;justify-content:center}.wa span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}}
+dialog[open]~.wa{display:none}
+
+/* 404 */
+.nf{max-width:640px;margin:40px auto 60px;text-align:center;display:grid;gap:18px;justify-items:center}
+.nf-code{font-family:var(--display);font-size:clamp(90px,18vw,150px);font-weight:700;line-height:.9;letter-spacing:-.04em;color:var(--accent)}
+.nf .lead{font-size:17px}
+.nf-search{display:flex;gap:8px;width:100%;max-width:480px}
+.nf-search input{flex:1;min-width:0;border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:12px 18px}
+.nf a{color:var(--accent);font-weight:700}
+
+/* páginas legales (aviso-legal.html, privacidad.html, cookies.html, 404.html) */
+.lg-top{background:var(--surface);border-bottom:1px solid var(--line)}
+.lg-top .wrap{height:64px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.lg-top .logo{text-decoration:none}
+.lg-top a.back{font-weight:600;color:var(--accent)}
+.lg{max-width:780px;margin:0 auto;padding:40px 24px 80px}
+.lg h1{font-size:clamp(34px,5vw,48px);margin-bottom:8px}
+.lg h2{font-size:24px;margin:36px 0 10px}
+.lg h3{font-size:18px;margin:22px 0 6px}
+.lg p,.lg li{margin:0 0 12px;line-height:1.65}
+.lg ul{padding-left:22px;margin:0 0 12px}
+.lg a{color:var(--accent);font-weight:600}
+.lg .upd{color:var(--muted);font-size:14px;margin-bottom:26px}
+.lg table{width:100%;border-collapse:collapse;margin:8px 0 18px;font-size:14px;display:block;overflow-x:auto}
+.lg th,.lg td{border:1px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top}
+.lg th{background:var(--soft)}
+.lg .box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 18px}
+.lg .missing{background:#FFF3C4;color:#5A4500;padding:0 4px;border-radius:4px}
+.lg-foot{border-top:1px solid var(--line);padding:24px;text-align:center;font-size:14px;color:var(--muted)}
+.lg-foot a{color:inherit;margin:0 8px}
+.htext .cta-sub{margin-top:-8px}
+@media (max-width:560px){.ck-in p{font-size:13.5px;line-height:1.45}.ck-in{gap:12px}}
+
+.foot .fh{font-family:var(--body);font-weight:600;line-height:1.3}
+.foot h4,.foot .fh{opacity:1;color:var(--muted)}
+/* evita saltos al cargar: la zona principal ocupa la pantalla desde el principio */
+main#view{min-height:calc(100vh - var(--top-h))}
