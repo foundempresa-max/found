@@ -1612,3 +1612,14 @@ body.has-ck .instcard{display:none}
 .is-app .foot{display:none}
 .is-app .home{padding-bottom:calc(40px + var(--tab-h))}
 .ios-inst .grab{position:absolute;left:0;right:0;top:0;margin:0}
+
+/* v22.1 · la web es siempre clara: con el ordenador en modo oscuro no se mezclan colores oscuros
+   (antes, los fondos grises se volvían negros y el texto negro encima no se leía) */
+:root{color-scheme:light}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="dark"]){color-scheme:light;
+    --bg:#FFFFFF; --surface:#FFFFFF; --soft:#F2F2EF; --stage:#F2F2EF; --ink:#141414; --muted:#5C5C58; --line:#E6E6E2;
+    --accent:#2F4A3A; --accent-ink:#FFFFFF; --deep:#1F3328; --deep-ink:#F4F4F1; --tagc:#E9EEE9; --tag-ink:#1F3328;
+    --accent-on-deep:#BFD3C4; --danger:#B3261E; --ok:#1E7A55;
+    --shadow:0 1px 2px rgba(26,26,24,.05),0 12px 28px -14px rgba(26,26,24,.22)}
+}
