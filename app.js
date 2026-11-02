@@ -994,7 +994,7 @@ VIEWS.inicio = () => {
 
     <section class="hsec">
       ${head(T('styles.title', 'Compra por estilo'), '#/explorar', 'Ver todo')}
-      <div class="stylerow">${C.styles.map((s, i) => [s, i]).filter(([s]) => !S.products.length || styleCount(s) > 0).map(([s, i]) => { const n = styleCount(s); const img = styleImg(s); const sample = !img && ranked(S.products.filter(p => p.tags.includes(s)))[0]; return `<button class="stylecard${img || sample ? ' hasimg' : ''}" data-act="style" data-v="${esc(s)}" style="background:${sample ? tileBg(sample) : STYLE_COLORS[i % STYLE_COLORS.length]}">${img ? `<img class="sc-img" src="${esc(img)}" alt="" loading="lazy" decoding="async">` : sample ? `<span class="sc-img">${pic(sample, '')}</span>` : ''}<span class="sc-txt"><b>${esc(s)}</b><small>${n ? n + (n === 1 ? ' prenda' : ' prendas') : 'Muy pronto'}</small></span></button>`; }).join('')}</div>
+      <div class="stylerow">${C.styles.map((s, i) => [s, i]).filter(([s], _, all) => all.filter(([x]) => styleCount(x) > 0).length < 5 || styleCount(s) > 0).map(([s, i]) => { const n = styleCount(s); const img = styleImg(s); const sample = !img && ranked(S.products.filter(p => p.tags.includes(s)))[0]; return `<button class="stylecard${img || sample ? ' hasimg' : ''}" data-act="style" data-v="${esc(s)}" style="background:${sample ? tileBg(sample) : STYLE_COLORS[i % STYLE_COLORS.length]}">${img ? `<img class="sc-img" src="${esc(img)}" alt="" loading="lazy" decoding="async">` : sample ? `<span class="sc-img">${pic(sample, '')}</span>` : ''}<span class="sc-txt"><b>${esc(s)}</b><small>${n ? n + (n === 1 ? ' prenda' : ' prendas') : 'Muy pronto'}</small></span></button>`; }).join('')}</div>
     </section>
 
     ${brands.length >= 3 ? `<section class="hsec">

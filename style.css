@@ -1623,3 +1623,9 @@ body.has-ck .instcard{display:none}
     --accent-on-deep:#BFD3C4; --danger:#B3261E; --ok:#1E7A55;
     --shadow:0 1px 2px rgba(26,26,24,.05),0 12px 28px -14px rgba(26,26,24,.22)}
 }
+
+/* v22.2 · cada estilo mantiene su tamaño aunque haya pocos (antes uno solo ocupaba todo el ancho) */
+.stylerow{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+@media (min-width:821px){.stylerow{grid-template-columns:repeat(7,minmax(0,1fr))}}
+.grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+@media (min-width:821px){.home .grid{grid-template-columns:repeat(5,minmax(0,1fr))}}
