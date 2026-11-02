@@ -1389,3 +1389,164 @@ dialog[open]~.wa{display:none}
 .foot h4,.foot .fh{opacity:1;color:var(--muted)}
 /* evita saltos al cargar: la zona principal ocupa la pantalla desde el principio */
 main#view{min-height:calc(100vh - var(--top-h))}
+
+/* ==========================================================
+   v21 · ASPECTO PROFESIONAL
+   Referencias: taste-skill (reglas de la casa), guía de diseño de Claude
+   y el sistema de Nike de awesome-design-md (tienda de moda).
+   · Lienzo blanco; las prendas se apoyan en un gris piedra (no crema).
+   · Tinta casi negra para todo; el verde de FOUND solo en la acción principal.
+   · Sin líneas finas ni cajas con borde: superficies separadas por un tono.
+   · Una sola familia (Hanken Grotesk) en cinco tamaños; titular grande.
+   Para volver al aspecto anterior, borra desde aquí hasta el final.
+   ========================================================== */
+:root:not([data-theme="dark"]){
+  --bg:#FFFFFF; --surface:#FFFFFF; --soft:#F2F2EF; --stage:#F2F2EF; --ink:#141414; --muted:#5C5C58; --line:#E6E6E2;
+  --accent:#2F4A3A; --accent-ink:#FFFFFF; --deep:#1F3328; --deep-ink:#F4F4F1; --tagc:#E9EEE9; --tag-ink:#1F3328;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--stage:#1F201D}}
+body{font-size:16px}
+::selection{background:#DCE6DE;color:#141414}
+
+/* cabecera: blanca y sin raya; la sombra aparece solo cuando la página ya ha bajado */
+.top{border-bottom:0;box-shadow:inset 0 -1px 0 transparent;transition:box-shadow .2s}
+body.scrolled .top{box-shadow:0 1px 0 rgba(20,20,20,.06),0 8px 24px -16px rgba(20,20,20,.25)}
+.hsearch{background:var(--stage);border:0;border-radius:999px}
+.hsearch:focus-within{background:var(--surface);box-shadow:0 0 0 2px var(--ink)}
+.hcats{gap:28px}
+.hcats a{font-size:15px}
+.nav a{font-weight:500}
+.nav a[aria-current="page"]{background:var(--stage);color:var(--ink)}
+
+/* títulos de sección más firmes y sin «Ver todo» subrayado */
+.shead h2{font-size:clamp(24px,2.2vw,30px);letter-spacing:-.03em;font-weight:600}
+.shead a{text-decoration:none;font-weight:600;font-size:15px;color:var(--ink);padding:8px 0}
+.shead a:hover{text-decoration:underline;text-underline-offset:4px}
+.hsec{margin-top:clamp(56px,7vw,104px)}
+
+/* chips: rellenos, sin contorno */
+.chip{border:0;background:var(--stage);font-size:15px;padding:10px 16px}
+.chip:hover{background:#E7E7E3}
+.chip[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+/* botones: planos, completamente redondos, sin sombra */
+.btn{border-radius:999px;padding:15px 26px;font-size:16px;font-weight:600}
+.btn.ghost{border:0;background:var(--stage)}
+.btn.ghost:hover{background:#E7E7E3}
+.btn:hover{transform:none}
+
+/* ---------- portada: titular grande y un escaparate que domina la pantalla ---------- */
+.home{padding-top:clamp(20px,3vw,40px)}
+.hbox{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,6fr);gap:clamp(24px,3vw,48px);align-items:stretch;background:none;border:0;border-radius:0;overflow:visible}
+.htext{padding:clamp(8px,2vw,32px) 0;gap:20px;justify-content:center}
+.htext h1{font-size:clamp(44px,5.2vw,80px);line-height:.95;letter-spacing:-.045em;font-weight:600;max-width:12ch;text-wrap:balance}
+.home h1 em,.htext h1 em{font-style:normal;color:inherit;font-weight:inherit}
+.htext .lead{font-size:clamp(17px,1.4vw,20px);color:var(--ink);max-width:34ch;line-height:1.45}
+.htext .cta-sub{margin-top:-6px;font-size:14px;color:var(--muted)}
+.hpics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:8px;min-height:0;height:clamp(420px,62vh,660px)}
+.hpic{min-height:0;border-radius:4px;background:var(--stage)}
+.hpic:first-child{grid-row:1/3}
+.hpic svg,.hpic img{transition:transform .6s cubic-bezier(.4,0,.2,1)}
+.hpic:hover svg,.hpic:hover img{transform:scale(1.03)}
+
+/* ---------- tarjetas de prenda: foto a sangre sobre gris piedra, datos debajo ---------- */
+.grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:36px 8px}
+.tile{aspect-ratio:4/5;border-radius:4px}
+.tile::after{border-radius:4px}
+.tile>img:first-child{object-fit:cover;width:100%;height:100%}
+.meta{padding:12px 4px 0;gap:2px}
+.meta .n{font-size:15.5px;font-weight:500;color:var(--ink)}
+.meta .p{order:3;font-size:15.5px;font-weight:600;margin-top:2px}
+.meta .b{order:2;font-size:14.5px;color:var(--muted)}
+.meta .b b{color:var(--accent)}
+.heart{background:rgba(255,255,255,.92);width:40px;height:40px}
+/* etiqueta «% para ti»: la firma de FOUND, como una etiqueta colgada de la prenda */
+.hang{left:10px;top:10px;background:var(--accent);color:#fff;border-radius:999px;padding:5px 10px;font-size:12.5px;font-weight:600;letter-spacing:0}
+
+/* ---------- comprar por estilo: cada estilo con una prenda suya ---------- */
+.stylerow{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.stylecard{border-radius:4px;aspect-ratio:4/5;padding:0;overflow:hidden;position:relative;justify-content:flex-end}
+.stylecard .sc-img{position:absolute;inset:0;display:block;width:100%;height:100%}
+.stylecard .sc-img img,.stylecard .sc-img svg,.stylecard img.sc-img{width:100%;height:100%;object-fit:cover;display:block}
+.stylecard .sc-txt{position:relative;z-index:1;display:flex;flex-direction:column;gap:2px;margin:10px;padding:10px 12px;background:#fff;border-radius:4px;align-self:flex-start}
+.stylecard.hasimg .sc-txt{border-radius:4px}
+.stylecard b{font-size:16px}
+.stylecard small{font-size:13.5px;color:var(--muted)}
+.stylecard:hover{filter:none}
+
+/* ---------- marcas ---------- */
+.bmini{gap:8px}
+.bmini a{border:0;background:var(--stage);border-radius:4px;padding:24px 12px}
+.bmini a:hover{background:#E7E7E3}
+.brandcard{border:0;background:var(--stage);border-radius:4px}
+
+/* ---------- franja para marcas: un campo de color a lo ancho ---------- */
+.hband{border-radius:4px;padding:clamp(28px,4vw,56px);background:var(--deep)}
+.hband b{font-size:clamp(24px,2.6vw,36px);letter-spacing:-.03em;line-height:1.1}
+.hband span{font-size:17px;opacity:.85}
+.bandlink{font-size:16px;padding:14px 24px;border-radius:999px;background:#fff;color:var(--deep);text-decoration:none}
+.bandlink:hover{background:#E9EEE9}
+
+/* ---------- cajas del resto de pantallas: superficie en vez de borde ---------- */
+.card-box,.qblock,.authgrid{border:0;background:var(--stage);border-radius:6px}
+.card-box .field input,.card-box .field textarea,.card-box .field select{background:#fff}
+
+/* ---------- pie: un cierre, con el nombre a todo lo ancho ---------- */
+.foot{background:var(--stage);border-top:0;padding-bottom:0}
+.foot .legal{border-top:0}
+.foot a{text-decoration:none}
+.foot a:hover{text-decoration:underline;text-underline-offset:3px}
+.fword{margin:clamp(24px,4vw,48px) 0 0;font-weight:700;font-size:clamp(72px,21vw,320px);line-height:.8;letter-spacing:-.04em;color:var(--ink);overflow:hidden;white-space:nowrap;user-select:none;transform:translateY(.08em)}
+
+/* ---------- esqueleto de carga ---------- */
+@keyframes sk-shine{0%{opacity:.55}50%{opacity:1}100%{opacity:.55}}
+.sk i{display:block;background:var(--stage);border-radius:4px;animation:sk-shine 1.4s ease-in-out infinite}
+.sk-hero{display:grid;grid-template-columns:5fr 7fr;gap:48px;align-items:center}
+.sk-t{display:grid;gap:14px}
+.sk-t i{height:56px;width:90%}.sk-t i.s{height:18px;width:70%}.sk-t i.b{height:52px;width:200px;border-radius:999px;margin-top:8px}
+.sk-p{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px;height:clamp(420px,62vh,660px)}
+.sk-p i:first-child{grid-row:1/3}
+.sk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:80px}
+.sk-grid i{aspect-ratio:4/5}
+@media (prefers-reduced-motion: reduce){.sk i{animation:none}}
+
+/* ---------- móvil ---------- */
+@media (max-width:820px){
+  .hbox{grid-template-columns:1fr;gap:20px}
+  .htext{padding:4px 0 0}
+  .htext h1{font-size:clamp(40px,11vw,56px);max-width:none}
+  .hpics{height:auto;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:none}
+  .hpic{aspect-ratio:3/4}
+  .hpic:first-child{grid-row:auto}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:28px 6px}
+  .stylerow,.bmini{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-flow:row;grid-auto-columns:auto;overflow:visible;margin:0;padding:0}
+  .mcats{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+  .sk-hero{grid-template-columns:1fr;gap:20px}.sk-p{height:auto;grid-template-columns:repeat(3,1fr);grid-template-rows:none}.sk-p i{aspect-ratio:3/4;grid-row:auto!important}
+  .sk-grid{grid-template-columns:1fr 1fr;margin-top:40px}
+  .ck-in p{font-size:14px}
+}
+/* barra inferior del móvil: flota, así que se separa con una sombra suave y no con una raya */
+.tabbar{border-top:0!important;box-shadow:0 -10px 24px -18px rgba(20,20,20,.35);background:color-mix(in srgb,var(--surface) 96%,transparent)}
+.hband span,.htext .lead,.pagehead p{max-width:60ch}
+.related h3{text-transform:none;font-weight:600;font-stretch:100%;font-size:20px;letter-spacing:-.02em}
+.dbrand{font-weight:600}
+/* sin etiquetas en mayúsculas sobre los títulos ni palabras destacadas en cursiva/color */
+.hero .eyebrow,.pagehead .eyebrow,.sec-head .eyebrow,.pricing .eyebrow{display:none}
+.eyebrow{text-transform:none;letter-spacing:0;font-size:14px}
+.eyebrow::before{display:none}
+h1 em,h2 em{font-style:normal!important;color:inherit!important;font-weight:inherit}
+.hero h1{font-size:clamp(40px,5.2vw,80px);line-height:.98;letter-spacing:-.045em;max-width:14ch;text-wrap:balance}
+.hero .lead,.lead{color:var(--ink)}
+.sec-head h2{font-size:clamp(28px,3vw,44px);letter-spacing:-.035em}
+.foot .fword{margin:clamp(24px,4vw,48px) 0 0;font-family:var(--display);font-weight:700;font-size:clamp(72px,21vw,320px);line-height:.8;letter-spacing:-.05em;color:var(--ink);overflow:hidden;white-space:nowrap;user-select:none}
+.pagehead,.related,.lg-top,.lg-foot{border:0!important}
+.hero{border:0!important}
+.related{background:var(--stage)}
+.lg-top{background:#fff}.lg-foot{background:var(--stage)}
+.foot .fword{opacity:1!important;color:var(--ink)!important}
+/* «Vende en FOUND»: el texto a la izquierda y las prendas a la derecha, como en la portada */
+.vhero{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,6fr);gap:clamp(24px,3vw,48px);align-items:center;padding:clamp(24px,4vw,56px) 0}
+.vhero .hpics{height:clamp(380px,56vh,600px)}
+@media (max-width:820px){.vhero{grid-template-columns:1fr}.vhero .hpics{height:auto}}
+.section{border:0!important}
+.foot .fword{font-size:min(24.5vw,372px)}

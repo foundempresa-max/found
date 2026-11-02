@@ -305,6 +305,18 @@ y sus dos líneas en `index.html`, y la web funciona igual.
 - **Ficha de la prenda:** el fondo se oscurece y la ficha sube. **Cambio de sección:** fundido suave. **Botones:** se hunden al pulsar.
 - Solo se anima lo que el móvil mueve sin esfuerzo. Con «reducir movimiento» activado en el teléfono, solo hay fundidos cortos.
 
+## 2s. Aspecto profesional (v21)
+No hay que ejecutar nada en Supabase. Todo está al final de `style.css`, desde la línea `v21 · ASPECTO PROFESIONAL`
+(si lo borras, vuelve el aspecto de la v20).
+- Fondo blanco; las prendas se apoyan en un gris piedra. Texto casi negro; el verde de FOUND solo en la acción principal y en «% para ti».
+- Sin rayas ni cajas con borde: las zonas se separan con un tono.
+- Portada con titular grande y un escaparate de una prenda grande y dos pequeñas.
+- Tarjetas en formato vertical uniforme (4:5): nombre, marca y talla, y el precio al final.
+- «Compra por estilo» enseña una prenda de cada estilo (o la foto que subas en Ajustes) y oculta los estilos sin prendas.
+- «Recién llegado» solo sale con 4 prendas o más, y «Marcas» con 3 marcas o más.
+- Siluetas grises mientras carga, y el nombre FOUND en grande al final del pie.
+- Revisado con el inspector de taste-skill, la guía de diseño de Claude y el sistema de Nike (awesome-design-md).
+
 ## 3. Publicarlo en internet con GitHub Pages (gratis)
 La web vive en GitHub y los datos siguen en Supabase. En los pasos, cambia `tu-usuario` por tu usuario de GitHub.
 

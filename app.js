@@ -863,7 +863,7 @@ function renderNav() {
   if (isBrand()) { links.push(['panel', 'Mi panel', ICON.store, 't', nb]); links.push(['panel', 'Mi panel', ICON.store, 'd']); links.push(['mensajes', 'Mensajes', ICON.store, 'd', nb]); }
   if (isAdmin()) links.push(['admin', 'Creador', ICON.cog, 'dt', nb]);
   links.push([S.user ? 'cuenta' : 'entrar', S.user ? 'Cuenta' : 'Entrar', ICON.user, 'dt']);
-  const cur = n => (r === n || (n === 'cuenta' && r === 'gustos') || (n === 'marcas' && r === 'marca') || (n === 'entrar' && r === 'vender') || (n === 'panel' && r === 'mensajes' && !isAdmin())) ? ' aria-current="page"' : '';
+  const cur = n => (r === n || (n === 'cuenta' && r === 'gustos') || (n === 'marcas' && r === 'marca') || (n === 'panel' && r === 'mensajes' && !isAdmin())) ? ' aria-current="page"' : '';
   const curD = n => (n === 'panel' || n === 'mensajes') ? (r === n ? ' aria-current="page"' : '') : cur(n);
   // v19 · una sola llamada a la acción: «Vende en FOUND» pasa a ser un enlace normal del menú
   const cta = !isBrand() && !isAdmin() ? `<a href="#/vender"${cur('vender')}>Vende en ${esc(C.appName)}</a>` : '';
@@ -889,7 +889,8 @@ function renderFoot() {
     <div><h2 class="fh">Marcas</h2><ul><li><a href="#/vender">Vende en ${esc(C.appName)}</a></li>${isBrand() ? '<li><a href="#/panel">Mi panel</a></li>' : '<li><a href="#/vender">Crear cuenta de marca</a></li>'}</ul></div>
     <div><h2 class="fh">${esc(C.appName)}</h2><ul><li><a href="#/vender">Cómo funciona</a></li>${contact}${ig}<li><a href="#/${S.user ? 'cuenta' : 'entrar'}">${S.user ? 'Mi cuenta' : 'Entrar'}</a></li></ul></div>
   </div><div class="legal"><span>© ${year} ${esc(C.appName)}</span><span>${T('foot.legal', 'La compra se realiza en la tienda de cada marca.')}</span>
-    <nav class="legal-links" aria-label="Información legal"><a href="aviso-legal.html">Aviso legal</a><a href="privacidad.html">Privacidad</a><a href="cookies.html">Cookies</a><button type="button" class="linkbtn" data-ck="open">Configurar cookies</button></nav></div></div>`;
+    <nav class="legal-links" aria-label="Información legal"><a href="aviso-legal.html">Aviso legal</a><a href="privacidad.html">Privacidad</a><a href="cookies.html">Cookies</a><button type="button" class="linkbtn" data-ck="open">Configurar cookies</button></nav></div>
+  <p class="fword" aria-hidden="true">${esc(C.appName)}</p></div>`;
 }
 
 /* ==========================================================
@@ -993,15 +994,15 @@ VIEWS.inicio = () => {
 
     <section class="hsec">
       ${head(T('styles.title', 'Compra por estilo'), '#/explorar', 'Ver todo')}
-      <div class="stylerow">${C.styles.map((s, i) => { const n = styleCount(s); const img = styleImg(s); return `<button class="stylecard${img ? ' hasimg' : ''}" data-act="style" data-v="${esc(s)}" style="background:${STYLE_COLORS[i % STYLE_COLORS.length]}">${img ? `<img class="sc-img" src="${esc(img)}" alt="" loading="lazy">` : ''}<span class="sc-txt"><b>${esc(s)}</b><small>${n ? n + (n === 1 ? ' prenda' : ' prendas') : 'Muy pronto'}</small></span></button>`; }).join('')}</div>
+      <div class="stylerow">${C.styles.map((s, i) => [s, i]).filter(([s]) => !S.products.length || styleCount(s) > 0).map(([s, i]) => { const n = styleCount(s); const img = styleImg(s); const sample = !img && ranked(S.products.filter(p => p.tags.includes(s)))[0]; return `<button class="stylecard${img || sample ? ' hasimg' : ''}" data-act="style" data-v="${esc(s)}" style="background:${sample ? tileBg(sample) : STYLE_COLORS[i % STYLE_COLORS.length]}">${img ? `<img class="sc-img" src="${esc(img)}" alt="" loading="lazy" decoding="async">` : sample ? `<span class="sc-img">${pic(sample, '')}</span>` : ''}<span class="sc-txt"><b>${esc(s)}</b><small>${n ? n + (n === 1 ? ' prenda' : ' prendas') : 'Muy pronto'}</small></span></button>`; }).join('')}</div>
     </section>
 
-    ${brands.length ? `<section class="hsec">
+    ${brands.length >= 3 ? `<section class="hsec">
       ${head(T('brands.title', 'Marcas que te pueden gustar'), '#/marcas', 'Todas las marcas')}
       <div class="bmini">${brands.slice(0, 6).map(b => `<a href="#/marca/${esc(b.id)}">${avatar(b)}<b>${esc(b.name)}</b><small>${b.items.length} ${b.items.length === 1 ? 'prenda' : 'prendas'}</small></a>`).join('')}</div>
     </section>` : ''}
 
-    ${fresh.length ? `<section class="hsec">
+    ${fresh.length >= 4 ? `<section class="hsec">
       ${head(T('new.title', 'Recién llegado'), '#/explorar', 'Explorar todo')}
       <div class="grid">${fresh.map(cardHTML).join('')}</div>
     </section>` : ''}
@@ -1027,14 +1028,15 @@ VIEWS.marcas = () => {
 /* --- Vende en FOUND --- */
 VIEWS.vender = () => {
   view.innerHTML = `<div class="wrap">
-    <section class="hero" style="grid-template-columns:1fr">
-      <div style="max-width:880px">
+    <section class="hero vhero">
+      <div>
         <span class="eyebrow">${T('sell.eyebrow', 'Para marcas independientes')}</span>
-        <h1>${T('sell.title', 'Tus prendas, delante de quien *ya* las busca.')}</h1>
+        <h1>${T('sell.title', 'Tus prendas, ante quien las busca.')}</h1>
         <p class="lead">${T('sell.lead', 'En ' + C.appName + ' los compradores nos dicen su estilo antes de empezar. Tú etiquetas tus prendas y nosotros las enseñamos a las personas con las que encajan.')}</p>
         <div class="ctas"><button class="btn" data-act="brandsignup">${isBrand() ? 'Ir a mi panel' : 'Crear cuenta de marca'} <span class="arr" aria-hidden="true">→</span></button></div>
         <p class="cta-sub muted">${billingOn() ? 'Suscripción mensual · cancela cuando quieras' : 'Gratis · sin comisiones por venta'}</p>
       </div>
+      ${S.products.length >= 3 ? `<div class="hpics" aria-hidden="true">${ranked(S.products).slice(0, 3).map(p => `<div class="hpic" style="background:${tileBg(p)}">${pic(p, '')}</div>`).join('')}</div>` : ''}
     </section></div>
     <section class="section tint"><div class="wrap">
       <div class="sec-head"><div><span class="eyebrow">${T('sell.how', 'Cómo funciona')}</span><h2>${T('sell.howtitle', 'Empezar te lleva *diez minutos*.')}</h2></div></div>
@@ -2715,6 +2717,8 @@ function route() {
   if (S.route !== 'descubrir') window.scrollTo(0, 0);
 }
 window.addEventListener('hashchange', route);
+// cabecera: sombra solo cuando la página ha bajado
+window.addEventListener('scroll', () => document.body.classList.toggle('scrolled', window.scrollY > 8), { passive: true });
 // buscador de la cabecera: al pulsar Intro lleva a Explorar con lo escrito
 document.addEventListener('change', e => { if (e.target.id === 'f-imgs') { addPhotos([...e.target.files]); } });
 document.addEventListener('submit', e => {
