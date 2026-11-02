@@ -64,7 +64,7 @@
 /* ---------- ficha de la prenda: el fondo se oscurece y la ficha sube ---------- */
 @keyframes m-dlg{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes m-fade{from{opacity:0}to{opacity:1}}
-.m-on dialog#dlg[open]{animation:m-dlg var(--m-std) var(--m-out) both}
+.m-on dialog#dlg[open]{animation:m-dlg var(--m-std) var(--m-out) backwards}
 .m-on dialog#dlg[open]::backdrop{animation:m-fade var(--m-std) var(--m-ease) both}
 
 /* ---------- aviso de cookies, botón de WhatsApp y avisos ---------- */

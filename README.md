@@ -317,6 +317,17 @@ No hay que ejecutar nada en Supabase. Todo está al final de `style.css`, desde 
 - Siluetas grises mientras carga, y el nombre FOUND en grande al final del pie.
 - Revisado con el inspector de taste-skill, la guía de diseño de Claude y el sistema de Nike (awesome-design-md).
 
+## 2t. Sensación de app (v22)
+No hay que ejecutar nada en Supabase. Sube también el archivo nuevo `sw.js`.
+- **Instalable:** en Android sale el botón nativo; en iPhone, una hoja con los pasos de Safari. Desde la segunda visita aparece
+  una tarjeta «FOUND en tu pantalla de inicio» (se puede cerrar; no vuelve en 30 días) y en el pie hay «Instalar la app».
+- **Instalada:** pantalla completa, accesos directos (Descubrir, Explorar, Guardados) y sin el pie de web.
+  Sus visitas salen en *Creador > Visitas* como «App».
+- **Sin conexión:** `sw.js` guarda la web y las últimas 200 fotos de prendas; los datos (cuentas, prendas, mensajes) siempre llegan de la red.
+  **Al publicar una versión nueva**, cambia `VERSION` al principio de `sw.js` para que todos reciban los archivos nuevos.
+- **Ficha de prenda en el móvil:** sube desde abajo, se cierra deslizando hacia abajo y el botón de comprar se queda fijo abajo.
+- **Transiciones entre pantallas** en Chrome, Edge y Safari 18+ (en otros navegadores, el fundido de siempre).
+
 ## 3. Publicarlo en internet con GitHub Pages (gratis)
 La web vive en GitHub y los datos siguen en Supabase. En los pasos, cambia `tu-usuario` por tu usuario de GitHub.
 

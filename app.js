@@ -887,7 +887,7 @@ function renderFoot() {
     <div><a class="logo" href="#/inicio">${esc(C.appName.slice(0, -1))}<b>${esc(C.appName.slice(-1))}</b></a><p>${T('foot.text', C.tagline + '. Marcas independientes y prendas elegidas según tu estilo.')}</p></div>
     <div><h2 class="fh">Comprar</h2><ul><li><a href="#/descubrir">Descubrir</a></li><li><a href="#/explorar">Explorar</a></li><li><a href="#/marcas">Marcas</a></li><li><a href="#/gustos">Test de estilo</a></li><li><a href="#/guardados">Guardados</a></li></ul></div>
     <div><h2 class="fh">Marcas</h2><ul><li><a href="#/vender">Vende en ${esc(C.appName)}</a></li>${isBrand() ? '<li><a href="#/panel">Mi panel</a></li>' : '<li><a href="#/vender">Crear cuenta de marca</a></li>'}</ul></div>
-    <div><h2 class="fh">${esc(C.appName)}</h2><ul><li><a href="#/vender">Cómo funciona</a></li>${contact}${ig}<li><a href="#/${S.user ? 'cuenta' : 'entrar'}">${S.user ? 'Mi cuenta' : 'Entrar'}</a></li></ul></div>
+    <div><h2 class="fh">${esc(C.appName)}</h2><ul><li><a href="#/vender">Cómo funciona</a></li><li data-install${canInstall() ? '' : ' hidden'}><button type="button" class="linkbtn foot-inst" data-act="install">Instalar la app</button></li>${contact}${ig}<li><a href="#/${S.user ? 'cuenta' : 'entrar'}">${S.user ? 'Mi cuenta' : 'Entrar'}</a></li></ul></div>
   </div><div class="legal"><span>© ${year} ${esc(C.appName)}</span><span>${T('foot.legal', 'La compra se realiza en la tienda de cada marca.')}</span>
     <nav class="legal-links" aria-label="Información legal"><a href="aviso-legal.html">Aviso legal</a><a href="privacidad.html">Privacidad</a><a href="cookies.html">Cookies</a><button type="button" class="linkbtn" data-ck="open">Configurar cookies</button></nav></div>
   <p class="fword" aria-hidden="true">${esc(C.appName)}</p></div>`;
@@ -2336,7 +2336,7 @@ function openProduct(id) {
   const buy = isUrl(p.buy_url)
     ? `<a class="btn" href="${esc(p.buy_url)}" target="_blank" rel="noopener noreferrer" data-track="buy" data-id="${esc(p.id)}">Comprar en la tienda de ${esc(p.brand)}</a>`
     : (p.contact ? `<a class="btn" data-track="buy" data-id="${esc(p.id)}" href="mailto:${esc(p.contact)}?subject=${encodeURIComponent('Me interesa: ' + p.name)}">Preguntar a ${esc(p.brand)}</a>` : '<span class="muted">Esta marca aún no ha añadido un enlace de compra.</span>');
-  dlg.innerHTML = `<div style="position:relative"><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button>
+  dlg.innerHTML = `<div style="position:relative"><span class="grab" aria-hidden="true"></span><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button>
     <div class="dgrid"><div class="art" style="background:${tileBg(p)}">${galleryHTML(p)}${m !== null ? `<span class="hang">${m} % para ti</span>` : ''}</div>
     <div class="dinfo">
       <a href="#/marca/${esc(p.brand_id)}" data-act="closeDlg" class="muted dbrand">${miniLogo(p.logo)}${esc(p.brand)}</a>
@@ -2351,7 +2351,7 @@ function openProduct(id) {
         fit === true ? '✓ Hay tu talla' : fit === false ? '· No hay tu talla' : ''
       ].filter(Boolean).join('<br>')}</span></div>` : ''}
       <p class="grow">${esc(p.desc || 'Sin descripción todavía.')}</p>
-      ${buy}
+      <div class="buybar">${buy}</div>
       <div class="dacts"><button class="btn ghost" data-act="fav" data-id="${esc(p.id)}" aria-pressed="${fav}">${fav ? 'Quitar de guardados' : 'Guardar'}</button>
         <button class="btn ghost" data-act="share" data-v="p" data-id="${esc(p.id)}">${ICON.share} Compartir</button></div>
       ${isAdmin() || (S.user && S.user.id === p.brand_id) ? '' : `<div class="repwrap" id="repbox"><button class="linkbtn replink" data-act="report" data-id="${esc(p.id)}">Denunciar esta prenda</button></div>`}
@@ -2471,6 +2471,8 @@ document.addEventListener('click', async e => {
   switch (a) {
     case 'open': openProduct(id); break;
     case 'closeDlg': dlg.close(); break;
+    case 'install': doInstall(); break;
+    case 'insthide': lsSet('found_inst_hide', Date.now()); { const c = $('#instcard'); if (c) c.remove(); } break;
     case 'gal': galGo(+v); break;
     case 'galto': galGo(+v, true); break;
     case 'fav': toggleFav(id); break;
@@ -2695,6 +2697,80 @@ function renderWhatsApp() {
 }
 
 /* ==========================================================
+   v22 · SENSACIÓN DE APP
+   · Se puede instalar (Android/escritorio: botón nativo; iPhone: instrucciones).
+   · Funciona sin conexión gracias a sw.js.
+   · En el móvil la ficha de la prenda sube desde abajo y se cierra deslizando.
+   ========================================================== */
+const standalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let installEvt = null;
+const canInstall = () => !standalone() && (!!installEvt || isIOS());
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; refreshInstallUI(); });
+window.addEventListener('appinstalled', () => { installEvt = null; refreshInstallUI(); toast('FOUND ya está en tu pantalla de inicio'); logSite('install'); });
+if (standalone()) document.documentElement.classList.add('is-app');
+function refreshInstallUI() { $$('[data-install]').forEach(el => { el.hidden = !canInstall(); }); maybeInstallCard(); }
+async function doInstall() {
+  if (installEvt) { installEvt.prompt(); const r = await installEvt.userChoice.catch(() => null); if (r && r.outcome === 'accepted') installEvt = null; refreshInstallUI(); return; }
+  if (isIOS()) openIOSInstall();
+}
+function openIOSInstall() {
+  dlg.innerHTML = `<div class="ios-inst"><span class="grab" aria-hidden="true"></span><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button>
+    <img src="apple-touch-icon.png" alt="" width="64" height="64">
+    <h2>Instala ${esc(C.appName)} en tu iPhone</h2>
+    <ol><li>Pulsa <b>Compartir</b> <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 002 2h10a2 2 0 002-2v-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> en la barra de Safari.</li>
+    <li>Elige <b>Añadir a pantalla de inicio</b>.</li><li>Pulsa <b>Añadir</b>. Abrirá a pantalla completa, como una app.</li></ol>
+    <button class="btn block" data-act="closeDlg">Entendido</button></div>`;
+  if (!dlg.open) dlg.showModal();
+}
+// tarjeta discreta en el móvil a partir de la segunda visita (se puede cerrar y no vuelve en 30 días)
+function maybeInstallCard() {
+  const old = $('#instcard'); if (old) old.remove();
+  if (!canInstall() || !matchMedia('(max-width:820px)').matches || S.route !== 'inicio') return;
+  if (window.FOUND_CONSENT && !window.FOUND_CONSENT.decided()) return;
+  const visits = Number(lsGet('found_visits', 0)), hid = Number(lsGet('found_inst_hide', 0));
+  if (visits < 2 || Date.now() - hid < 30 * 864e5) return;
+  const c = document.createElement('div'); c.id = 'instcard'; c.className = 'instcard';
+  c.innerHTML = `<img src="icon-192.png" alt="" width="40" height="40"><div><b>${esc(C.appName)} en tu pantalla de inicio</b><span>Abre al instante, como una app.</span></div><button class="btn small" data-act="install">Instalar</button><button class="instx" data-act="insthide" aria-label="No mostrar">×</button>`;
+  document.body.appendChild(c);
+}
+(() => { try { if (!sessionStorage.getItem('found_v')) { sessionStorage.setItem('found_v', '1'); lsSet('found_visits', Number(lsGet('found_visits', 0)) + 1); } } catch {} })();
+if (window.FOUND_CONSENT) window.FOUND_CONSENT.onChange(() => setTimeout(maybeInstallCard, 600));
+
+// sin conexión: aviso y se sigue viendo lo último cargado
+window.addEventListener('offline', () => toast('Sin conexión. Estás viendo lo último que se cargó.'));
+window.addEventListener('online', () => toast('Conexión recuperada'));
+
+// la ficha se cierra deslizándola hacia abajo (móvil)
+(function sheetSwipe() {
+  let y0 = 0, dy = 0, drag = false;
+  const mobile = () => matchMedia('(max-width:820px)').matches;
+  dlg.addEventListener('touchstart', e => {
+    if (!mobile() || !dlg.open) return;
+    const fromTop = e.target.closest('.grab') || e.touches[0].clientY - dlg.getBoundingClientRect().top < 56;
+    if (dlg.scrollTop > 0 && !fromTop) return;
+    if (e.target.closest('.gtrack') && !fromTop) return; // la galería se desliza en horizontal
+    y0 = e.touches[0].clientY; dy = 0; drag = true; dlg.style.transition = 'none';
+  }, { passive: true });
+  dlg.addEventListener('touchmove', e => {
+    if (!drag) return;
+    dy = Math.max(0, e.touches[0].clientY - y0);
+    if (dy > 0 && dlg.scrollTop <= 0) { dlg.style.transform = `translateY(${dy}px)`; }
+  }, { passive: true });
+  dlg.addEventListener('touchend', () => {
+    if (!drag) return; drag = false;
+    dlg.style.transition = 'transform .24s cubic-bezier(.4,0,.2,1)';
+    if (dy > 110) { dlg.style.transform = 'translateY(100%)'; setTimeout(() => { dlg.close(); dlg.style.transform = ''; dlg.style.transition = ''; }, 220); }
+    else { dlg.style.transform = ''; setTimeout(() => { dlg.style.transition = ''; }, 260); }
+  });
+})();
+
+// service worker: instalación y funcionamiento sin conexión
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || /^(localhost|127\.)/.test(location.hostname))) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
+
+/* ==========================================================
    ENRUTADOR E INICIO
    ========================================================== */
 function route() {
@@ -2713,10 +2789,17 @@ function route() {
   routeMeta(S.route, arg);
   renderEditBar();
   renderWhatsApp();
+  maybeInstallCard();
   trackPage();
   if (S.route !== 'descubrir') window.scrollTo(0, 0);
 }
-window.addEventListener('hashchange', route);
+// v22 · transición suave entre pantallas donde el navegador la sabe hacer (Chrome, Edge, Safari 18+)
+const canVT = typeof document.startViewTransition === 'function' && !reduceMotion;
+if (canVT) document.documentElement.classList.add('vt');
+window.addEventListener('hashchange', () => {
+  if (!canVT || !/^#\//.test(location.hash) || dlg.open) return route();
+  document.startViewTransition(() => route());
+});
 // cabecera: sombra solo cuando la página ha bajado
 window.addEventListener('scroll', () => document.body.classList.toggle('scrolled', window.scrollY > 8), { passive: true });
 // buscador de la cabecera: al pulsar Intro lleva a Explorar con lo escrito

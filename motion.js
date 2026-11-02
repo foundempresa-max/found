@@ -16,7 +16,8 @@
   /* ---------- cambio de pantalla ---------- */
   const view = document.getElementById('view');
   function enterView() {
-    if (!view || !root.classList.contains('m-on')) return;
+    // con transiciones nativas del navegador (v22) no hace falta el fundido propio
+    if (!view || !root.classList.contains('m-on') || root.classList.contains('vt')) return;
     view.classList.remove('m-enter'); void view.offsetWidth; view.classList.add('m-enter');
   }
   // app.js ya ha pintado la pantalla nueva cuando llega aquí (su escucha se registró antes)
