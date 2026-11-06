@@ -1642,3 +1642,7 @@ button,[role="button"],.heart,.tile,.hpic,.stylecard,.brandcard{touch-action:man
 .tile,.hpic{transition:transform 140ms cubic-bezier(.23,1,.32,1)}
 .tile:active,.hpic:active{transform:scale(.98)}
 @media (prefers-reduced-motion: reduce){.tile:active,.hpic:active{transform:none}}
+/* cabecera de cristal: las prendas se ven difuminadas al pasar por debajo (la barra de abajo sigue opaca para leer bien) */
+.top{background:color-mix(in srgb,var(--surface) 72%,transparent);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%)}
+body.scrolled .top{box-shadow:none}
+@media (prefers-reduced-transparency: reduce){.top{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none}body.scrolled .top{box-shadow:0 1px 0 rgba(20,20,20,.06)}}
