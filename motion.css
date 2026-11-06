@@ -14,9 +14,9 @@
   --m-out:cubic-bezier(.05,.7,.1,1);       /* entradas con énfasis */
   --m-in:cubic-bezier(.3,0,1,1);           /* salidas */
   --m-pop:cubic-bezier(.175,.885,.32,1.275);/* solo para «guardar» */
-  --m-quick:160ms; --m-std:320ms; --m-slow:520ms;
+  --m-quick:140ms; --m-std:240ms; --m-slow:300ms; /* skills de Emil Kowalski: la interfaz por debajo de 300 ms */
 }
-@media (max-width:820px){:root{--m-quick:130ms;--m-std:260ms;--m-slow:420ms}}
+@media (max-width:820px){:root{--m-quick:120ms;--m-std:220ms;--m-slow:280ms}}
 
 /* ---------- cambio de pantalla: la nueva sube un poco y aparece ---------- */
 @keyframes m-view{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}

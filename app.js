@@ -10,7 +10,12 @@ const C = window.FOUND_CONFIG;
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const money = n => Number(n).toLocaleString('es-ES', {maximumFractionDigits: 2}) + ' ' + C.currency;
+// precios: «1.284 €» (con punto también en 4 cifras) y «59,50 €» (céntimos completos)
+const NF_INT = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 });
+const NF_DEC = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = n => { const v = Number(n) || 0; return (Number.isInteger(v) ? NF_INT : NF_DEC).format(v) + ' ' + C.currency; };
+// inicial de un nombre: la primera letra o cifra (salta emojis y signos), en mayúscula
+const initial = s => { const m = String(s || '').match(/[\p{L}\p{N}]/u); return m ? m[0].toUpperCase() : '?'; };
 const isHex = c => /^#[0-9a-fA-F]{6}$/.test(c || '');
 const isUrl = u => /^https?:\/\/\S+$/i.test(u || '');
 const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
@@ -937,7 +942,7 @@ function brandList() {
 }
 const avatar = (b, lg) => b.logo
   ? `<span class="avatar has-img${lg ? ' lg' : ''}" aria-hidden="true"><img src="${esc(b.logo)}" alt=""></span>`
-  : `<span class="avatar${lg ? ' lg' : ''}" style="background:${esc(b.color)}" aria-hidden="true">${esc((b.name || '?').trim().charAt(0).toUpperCase())}</span>`;
+  : `<span class="avatar${lg ? ' lg' : ''}" style="background:${esc(b.color)}" aria-hidden="true">${esc(initial(b.name))}</span>`;
 const miniLogo = url => url ? `<img class="minilogo" src="${esc(url)}" alt="">` : '';
 const softBg = c => `color-mix(in srgb, ${c} 26%, #F2F0EA)`;
 function brandCardHTML(b) {
@@ -1410,7 +1415,7 @@ VIEWS.admin = async () => {
 };
 /* ---------- pestaña Visitas ---------- */
 const PAGE_NAMES = { inicio: 'Inicio', descubrir: 'Descubrir', explorar: 'Explorar', marcas: 'Directorio de marcas', marca: 'Página de una marca', prenda: 'Ficha de una prenda', vender: 'Vende en ' + C.appName, guardados: 'Guardados', gustos: 'Test de estilo', entrar: 'Entrar / crear cuenta', cuenta: 'Cuenta', panel: 'Panel de marca', pago: 'Pago', mensajes: 'Mensajes' };
-const nfmt = n => Number(n || 0).toLocaleString('es-ES');
+const nfmt = n => NF_INT.format(Number(n || 0));
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
 const shortDate = iso => new Date(iso + 'T12:00:00Z').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 async function visitsTeaser() {
@@ -2142,7 +2147,7 @@ function renderPanel() {
           <h2 style="margin-bottom:14px">Perfil de marca</h2>
           <div class="brandprev" aria-label="Vista previa de la cabecera de tu página">
             <div class="bp-cover" id="bp-cover">${S.profile.cover_url ? `<img src="${esc(S.profile.cover_url)}" alt="">` : '<span>Tu portada</span>'}</div>
-            <div class="bp-row"><span class="bp-logo" id="bp-logo">${S.profile.logo_url ? `<img src="${esc(S.profile.logo_url)}" alt="">` : esc((S.profile.brand_name || '?').trim().charAt(0).toUpperCase())}</span><b id="bp-name">${esc(S.profile.brand_name || 'Tu marca')}</b></div>
+            <div class="bp-row"><span class="bp-logo" id="bp-logo">${S.profile.logo_url ? `<img src="${esc(S.profile.logo_url)}" alt="">` : esc(initial(S.profile.brand_name))}</span><b id="bp-name">${esc(S.profile.brand_name || 'Tu marca')}</b></div>
           </div>
           <div class="row2">
             <div class="field"><span>Logo</span><input type="file" id="p-logo" accept="image/png,image/jpeg,image/webp">
@@ -2383,7 +2388,18 @@ function galGo(d, abs) {
   const i = abs ? d : Math.round(t.scrollLeft / t.clientWidth) + d;
   t.scrollTo({ left: Math.max(0, i) * t.clientWidth, behavior: reduceMotion ? 'auto' : 'smooth' });
 }
-dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+// cerrar la ficha: en el móvil baja por el mismo camino por el que subió; en el ordenador, al momento
+const sheetMode = () => matchMedia('(max-width:820px)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+function closeDlg() {
+  if (!dlg.open || dlg.classList.contains('closing')) return;
+  if (!sheetMode()) return dlg.close();
+  dlg.classList.add('closing');
+  dlg.style.transition = 'transform .28s cubic-bezier(.32,.72,0,1)';
+  dlg.style.transform = 'translateY(100%)';
+  setTimeout(() => { dlg.close(); dlg.classList.remove('closing'); dlg.style.transform = ''; dlg.style.transition = ''; }, 280);
+}
+dlg.addEventListener('click', e => { if (e.target === dlg) closeDlg(); });
+dlg.addEventListener('cancel', e => { if (sheetMode()) { e.preventDefault(); closeDlg(); } });
 dlg.addEventListener('close', () => { if (S.route) routeMeta(S.route, (location.hash.split('/')[2] || '')); });
 
 /* ---------- denunciar una prenda ---------- */
@@ -2470,7 +2486,7 @@ document.addEventListener('click', async e => {
   const a = b.dataset.act, v = b.dataset.v, id = b.dataset.id;
   switch (a) {
     case 'open': openProduct(id); break;
-    case 'closeDlg': dlg.close(); break;
+    case 'closeDlg': closeDlg(); break;
     case 'install': doInstall(); break;
     case 'insthide': lsSet('found_inst_hide', Date.now()); { const c = $('#instcard'); if (c) c.remove(); } break;
     case 'gal': galGo(+v); break;
@@ -2743,14 +2759,14 @@ window.addEventListener('online', () => toast('Conexión recuperada'));
 
 // la ficha se cierra deslizándola hacia abajo (móvil)
 (function sheetSwipe() {
-  let y0 = 0, dy = 0, drag = false;
+  let y0 = 0, dy = 0, t0 = 0, drag = false;
   const mobile = () => matchMedia('(max-width:820px)').matches;
   dlg.addEventListener('touchstart', e => {
     if (!mobile() || !dlg.open) return;
     const fromTop = e.target.closest('.grab') || e.touches[0].clientY - dlg.getBoundingClientRect().top < 56;
     if (dlg.scrollTop > 0 && !fromTop) return;
     if (e.target.closest('.gtrack') && !fromTop) return; // la galería se desliza en horizontal
-    y0 = e.touches[0].clientY; dy = 0; drag = true; dlg.style.transition = 'none';
+    y0 = e.touches[0].clientY; dy = 0; t0 = Date.now(); drag = true; dlg.style.transition = 'none';
   }, { passive: true });
   dlg.addEventListener('touchmove', e => {
     if (!drag) return;
@@ -2759,9 +2775,10 @@ window.addEventListener('online', () => toast('Conexión recuperada'));
   }, { passive: true });
   dlg.addEventListener('touchend', () => {
     if (!drag) return; drag = false;
-    dlg.style.transition = 'transform .24s cubic-bezier(.4,0,.2,1)';
-    if (dy > 110) { dlg.style.transform = 'translateY(100%)'; setTimeout(() => { dlg.close(); dlg.style.transform = ''; dlg.style.transition = ''; }, 220); }
-    else { dlg.style.transform = ''; setTimeout(() => { dlg.style.transition = ''; }, 260); }
+    const v = dy / Math.max(1, Date.now() - t0); // píxeles por milisegundo
+    dlg.style.transition = 'transform .28s cubic-bezier(.32,.72,0,1)';
+    if (dy > 110 || (dy > 24 && v > 0.11)) { dlg.style.transform = 'translateY(100%)'; setTimeout(() => { dlg.close(); dlg.style.transform = ''; dlg.style.transition = ''; }, 260); }
+    else { dlg.style.transform = ''; setTimeout(() => { dlg.style.transition = ''; }, 300); }
   });
 })();
 
