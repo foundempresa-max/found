@@ -1726,3 +1726,6 @@ dialog#dlg.catdlg{max-width:560px}
 .mt-logo img{width:100%;height:100%;object-fit:cover}
 @media (hover:hover) and (pointer:fine){.mtile>img{transition:transform 400ms cubic-bezier(.23,1,.32,1)}.mtile:hover>img{transform:scale(1.03)}}
 @media (prefers-reduced-motion:reduce){.mtile:active,.catopt:active,.catsq:active,.mtest:active{transform:none}}
+/* menú del ordenador: las cuatro páginas en el centro */
+.hcats{justify-content:center}
+.hcats a{padding:0 22px}
