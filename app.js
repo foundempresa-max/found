@@ -277,6 +277,8 @@ function supabaseApi() {
     async signUp({ email, password, role, brandName, captchaToken }) {
       const { data, error } = await sb.auth.signUp({ email, password, options: { data: { role, brand_name: brandName || null }, ...(captchaToken ? { captchaToken } : {}) } });
       fail(error);
+      // correo ya registrado: Supabase no da error ni envía correo (por seguridad), pero devuelve el usuario sin identidades
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) throw new Error('already registered');
       return { needsConfirm: !data.session, userId: data.user ? data.user.id : null };
     },
     async signIn({ email, password, captchaToken }) { const { error } = await sb.auth.signInWithPassword({ email, password, ...(captchaToken ? { options: { captchaToken } } : {}) }); fail(error); },
@@ -1368,7 +1370,7 @@ async function onAuthSubmit(e) {
 function traduce(msg) {
   const t = String(msg || '');
   if (/invalid login/i.test(t)) return 'Correo o contraseña incorrectos.';
-  if (/already registered|already been registered/i.test(t)) return 'Ya existe una cuenta con ese correo.';
+  if (/already registered|already been registered/i.test(t)) return 'Ya existe una cuenta con ese correo. Pulsa «Entrar» y usa tu contraseña.';
   if (/email not confirmed/i.test(t)) return 'Aún no has confirmado tu correo. Revisa tu bandeja de entrada.';
   if (/rate limit/i.test(t)) return 'Demasiados intentos. Espera un momento y vuelve a probar.';
   if (/captcha/i.test(t)) return 'No se pudo completar la comprobación de seguridad. Recarga la página y vuelve a probar.';
