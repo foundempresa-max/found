@@ -9,10 +9,10 @@
    · Datos de Supabase (cuentas, prendas, mensajes): siempre de la red, nunca se guardan.
    Al publicar una versión nueva, cambia VERSION para que todos reciban los archivos nuevos.
    ========================================================== */
-const VERSION = 'found-v23-3';
+const VERSION = 'found-v24';
 const SHELL = VERSION + '-shell', IMAGES = 'found-images', MAX_IMAGES = 200;
 const PRECACHE = [
-  './', 'index.html', 'style.css?v=23.1', 'app.js?v=23.3', 'config.js?v=22', 'consent.js?v=19', 'motion.css?v=23', 'motion.js?v=22',
+  './', 'index.html', 'style.css?v=24', 'app.js?v=24', 'config.js?v=22', 'consent.js?v=19', 'motion.css?v=23', 'motion.js?v=22',
   'vendor/supabase.js', 'fonts/hanken-grotesk-latin-wght-normal.woff2', 'fonts/hanken-grotesk-latin-wght-italic.woff2',
   'favicon.svg', 'favicon-32.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'site.webmanifest',
   'aviso-legal.html', 'privacidad.html', 'cookies.html', 'legal.js?v=19'

@@ -162,6 +162,7 @@ function art(p, full) {
 }
 const pic = (p, alt) => p.image ? `<img src="${esc(p.image)}" alt="${esc(alt === undefined ? `${p.name} de ${p.brand}` : alt)}" loading="lazy" decoding="async">` : art(p);
 const ICON = {
+  play:'<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M10 8.5v7l5.5-3.5z"/></svg>',
   heart:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.6 1.1 4.6 2.7h2C14 6.1 15.6 5 17.6 5 21 5 23.1 8.4 21.6 11.8 19.5 16.4 12 21 12 21z"/></svg>',
   info:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
   bag:'<svg viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6zM9 8V6a3 3 0 016 0v2"/></svg>',
@@ -644,7 +645,7 @@ const api = configured && hasLib ? supabaseApi() : demoApi();
 const S = {
   user: null, profile: null, products: [], allProducts: [], favs: new Set(), counts: {},
   taste: lsGet('found_taste', null),
-  cat: 'Todo', style: 'Todos', q: '', sort: 'match', authMode: 'in', authRole: 'buyer',
+  cats: [], style: 'Todos', q: '', sort: 'match', authMode: 'in', authRole: 'buyer',
   formTags: [], formSizes: [], formPhotos: [], onlyMine: true, editing: null, draft: null, settings: null, adminTab: 'resumen', siteDays: 30, rankDays: 30,
   billing: null, ev: {}, statsDays: 30, editMode: false, textDraft: {}, colorDraft: null, colorsOpen: false, resetTexts: false,
   unread: 0, chat: { brand: null, product: null, draft: '', thread: [] }
@@ -863,36 +864,66 @@ async function afterAuth() {
    ========================================================== */
 function renderNav() {
   const r = S.route;
-  // [ruta, texto, icono, dónde: d = menú de escritorio, t = barra móvil]
-  const links = [['inicio', 'Inicio', ICON.home, 't'], ['descubrir', 'Descubrir', ICON.compass, 'dt'], ['explorar', 'Explorar', ICON.grid, 'dt'], ['marcas', 'Marcas', ICON.store, 'd'], ['guardados', 'Guardados', ICON.heart, 'dt']];
-  // contador de mensajes sin leer: en el móvil va sobre «Mi panel» / «Creador»; en el ordenador, también sobre «Mensajes»
+  // v24 · cuatro páginas: Marcas (inicio), Feed, Favoritas y Mi cuenta
+  const acct = !S.user ? 'entrar' : isBrand() ? 'panel' : 'cuenta';
   const nb = `<span class="tabn navn" data-unread${S.unread ? '' : ' hidden'}>${S.unread}</span>`;
-  if (isBrand()) { links.push(['panel', 'Mi panel', ICON.store, 't', nb]); links.push(['panel', 'Mi panel', ICON.store, 'd']); links.push(['mensajes', 'Mensajes', ICON.store, 'd', nb]); }
-  if (isAdmin()) links.push(['admin', 'Creador', ICON.cog, 'dt', nb]);
-  links.push([S.user ? 'cuenta' : 'entrar', S.user ? 'Cuenta' : 'Entrar', ICON.user, 'dt']);
-  const cur = n => (r === n || (n === 'cuenta' && r === 'gustos') || (n === 'marcas' && r === 'marca') || (n === 'panel' && r === 'mensajes' && !isAdmin())) ? ' aria-current="page"' : '';
-  const curD = n => (n === 'panel' || n === 'mensajes') ? (r === n ? ' aria-current="page"' : '') : cur(n);
-  // v19 · una sola llamada a la acción: «Vende en FOUND» pasa a ser un enlace normal del menú
-  const cta = !isBrand() && !isAdmin() ? `<a href="#/vender"${cur('vender')}>Vende en ${esc(C.appName)}</a>` : '';
-  // v4 · escaparate: fila 1 = logo, buscador y cuenta; fila 2 = secciones y categorías (solo en ordenador)
-  const MAIN = ['descubrir', 'explorar', 'marcas', 'guardados'];
-  const acts = links.filter(l => l[3].includes('d') && !MAIN.includes(l[0])).map(([n, l, , , x]) => `<a href="#/${n}"${curD(n)}>${l}${x || ''}</a>`).join('');
-  const catCur = c => r === 'explorar' && S.cat === c ? ' aria-current="page"' : '';
+  const nfav = S.favs.size ? `<span class="tabc" aria-label="${S.favs.size} favoritas">${S.favs.size}</span>` : '';
+  const TABS = [
+    ['marcas', 'Marcas', ICON.compass, ['marcas', 'marca', 'vender']],
+    ['descubrir', 'Feed', ICON.play, ['descubrir', 'explorar', 'gustos']],
+    ['guardados', 'Favoritas', ICON.heart, ['guardados'], nfav],
+    [acct, 'Mi cuenta', ICON.user, ['cuenta', 'entrar', 'panel', 'mensajes', 'admin', 'pago'], (isBrand() || isAdmin()) ? nb : '']
+  ];
+  const curT = t => t[3].includes(r) ? ' aria-current="page"' : '';
+  const href = n => n === 'descubrir' ? '#/feed' : '#/' + n;
+  // en el ordenador, a la derecha: mensajes y creador cuando corresponde
+  const extra = (isBrand() ? `<a href="#/mensajes"${r === 'mensajes' ? ' aria-current="page"' : ''}>Mensajes${nb}</a>` : '') + (isAdmin() ? `<a href="#/admin"${r === 'admin' ? ' aria-current="page"' : ''}>Creador</a>` : '');
+  const cta = !isBrand() && !isAdmin() ? `<a href="#/vender"${r === 'vender' ? ' aria-current="page"' : ''}>Vende en ${esc(C.appName)}</a>` : '';
   $('#top').innerHTML = `${C.announcement ? `<div class="ann" role="note">${esc(C.announcement)}</div>` : ''}<div class="wrap">
-    <div class="hrow"><a class="logo" href="#/inicio" aria-label="${esc(C.appName)}, inicio">${esc(C.appName.slice(0, -1))}<b>${esc(C.appName.slice(-1))}</b>${api.live ? '' : '<span class="demo" title="Los datos se guardan solo en este navegador">DEMO</span>'}</a>
+    <div class="hrow"><a class="logo" href="#/marcas" aria-label="${esc(C.appName)}, inicio">${esc(C.appName.slice(0, -1))}<b>${esc(C.appName.slice(-1))}</b>${api.live ? '' : '<span class="demo" title="Los datos se guardan solo en este navegador">DEMO</span>'}</a>
       <form class="hsearch" id="hsearch" role="search">${ICON.search}<input type="search" id="hq" placeholder="${matchMedia('(max-width:480px)').matches ? 'Buscar en ' + esc(C.appName) : 'Busca prendas, marcas o estilos'}" aria-label="Buscar en ${esc(C.appName)}" value="${esc(S.q)}" autocomplete="off"></form>
-      <nav class="nav" aria-label="Cuenta"><a class="hfav" href="#/guardados" aria-label="Guardados"${cur('guardados')}>${ICON.heart}<span>Guardados</span></a>${acts}${cta}</nav></div>
-    <nav class="hcats" aria-label="Principal"><a href="#/inicio"${cur('inicio')}>Inicio</a><a href="#/descubrir"${cur('descubrir')}>Descubrir</a><a href="#/explorar"${r === 'explorar' && S.cat === 'Todo' ? ' aria-current="page"' : ''}>Explorar</a>${C.categories.map(c => `<a href="#/explorar" data-act="gocat" data-v="${esc(c)}"${catCur(c)}>${esc(c)}</a>`).join('')}<a href="#/marcas"${cur('marcas')}>Marcas</a></nav></div>`;
-  $('#tabbar').innerHTML = links.filter(l => l[3].includes('t')).map(([n, l, i, , x]) => `<a href="#/${n}"${cur(n)}>${i}<span>${l}</span>${x || ''}</a>`).join('');
+      <nav class="nav" aria-label="Más">${extra}${cta}</nav></div>
+    <nav class="hcats" aria-label="Principal">${TABS.map(t => `<a href="${href(t[0])}"${curT(t)}>${t[1]}${t[4] || ''}</a>`).join('')}</nav></div>`;
+  $('#tabbar').innerHTML = TABS.map(t => `<a href="${href(t[0])}"${curT(t)}>${t[2]}<span>${t[1]}</span>${t[4] || ''}</a>`).join('');
   renderFoot();
+}
+/* ---------- cuadrado de categorías: se toca y se eligen una o varias prendas ---------- */
+const catLabel = () => !S.cats.length ? 'Todas las prendas' : S.cats.length <= 2 ? S.cats.join(' y ') : S.cats.length + ' tipos de prenda';
+function catSquare(where) {
+  return `<button type="button" class="catsq${S.cats.length ? ' on' : ''}" data-act="cats" data-v="${where}" aria-haspopup="dialog">
+    <span class="catsq-ic" aria-hidden="true">${ICON.grid}${S.cats.length ? `<i>${S.cats.length}</i>` : ''}</span>
+    <span class="catsq-tx"><b>Prendas</b><small>${esc(catLabel())}</small></span></button>`;
+}
+let catDraft = [], catFrom = 'feed';
+function openCats(from) {
+  catFrom = from || 'feed'; catDraft = [...S.cats];
+  renderCats();
+  dlg.classList.add('catdlg');
+  if (!dlg.open) dlg.showModal();
+}
+function renderCats() {
+  const n = S.products.filter(p => (!S.onlyMine || fitsMe(p) !== false) && (!catDraft.length || catDraft.includes(p.cat))).length;
+  dlg.innerHTML = `<div class="catpick"><span class="grab" aria-hidden="true"></span><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button>
+    <h2>¿Qué buscas?</h2><p class="muted">Elige una o varias.</p>
+    <div class="catgrid" role="group" aria-label="Tipos de prenda">${C.categories.map(c => {
+      const on = catDraft.includes(c), cnt = S.products.filter(p => p.cat === c).length;
+      return `<button type="button" class="catopt" data-act="catpick" data-v="${esc(c)}" aria-pressed="${on}">${catArt(c)}<b>${esc(c)}</b><small>${cnt} ${cnt === 1 ? 'prenda' : 'prendas'}</small></button>`;
+    }).join('')}</div>
+    <div class="catacts"><button type="button" class="btn ghost" data-act="catclear"${catDraft.length ? '' : ' disabled'}>Borrar</button><button type="button" class="btn" data-act="catok">Ver ${n} ${n === 1 ? 'prenda' : 'prendas'}</button></div></div>`;
+}
+// dibujo pequeño de cada tipo de prenda (el mismo de las tarjetas, sin foto)
+function catArt(c) {
+  const g = GARMENTS[c];
+  if (!g) return `<span class="catart" aria-hidden="true">${ICON.grid}</span>`;
+  return `<span class="catart" aria-hidden="true"><svg viewBox="0 0 100 110"><path d="${g.body}"/></svg></span>`;
 }
 function renderFoot() {
   const year = new Date().getFullYear();
   const contact = C.contactEmail ? `<li><a href="mailto:${esc(C.contactEmail)}">${esc(C.contactEmail)}</a></li>` : '';
   const ig = isUrl(C.instagram) ? `<li><a href="${esc(C.instagram)}" target="_blank" rel="noopener noreferrer">Instagram</a></li>` : '';
   $('#foot').innerHTML = `<div class="wrap"><div class="cols">
-    <div><a class="logo" href="#/inicio">${esc(C.appName.slice(0, -1))}<b>${esc(C.appName.slice(-1))}</b></a><p>${T('foot.text', C.tagline + '. Marcas independientes y prendas elegidas según tu estilo.')}</p></div>
-    <div><h2 class="fh">Comprar</h2><ul><li><a href="#/descubrir">Descubrir</a></li><li><a href="#/explorar">Explorar</a></li><li><a href="#/marcas">Marcas</a></li><li><a href="#/gustos">Test de estilo</a></li><li><a href="#/guardados">Guardados</a></li></ul></div>
+    <div><a class="logo" href="#/marcas">${esc(C.appName.slice(0, -1))}<b>${esc(C.appName.slice(-1))}</b></a><p>${T('foot.text', C.tagline + '. Marcas independientes y prendas elegidas según tu estilo.')}</p></div>
+    <div><h2 class="fh">Comprar</h2><ul><li><a href="#/marcas">Marcas</a></li><li><a href="#/feed">Feed</a></li><li><a href="#/explorar">Buscar prendas</a></li><li><a href="#/gustos">Test de estilo</a></li><li><a href="#/guardados">Favoritas</a></li></ul></div>
     <div><h2 class="fh">Marcas</h2><ul><li><a href="#/vender">Vende en ${esc(C.appName)}</a></li>${isBrand() ? '<li><a href="#/panel">Mi panel</a></li>' : '<li><a href="#/vender">Crear cuenta de marca</a></li>'}</ul></div>
     <div><h2 class="fh">${esc(C.appName)}</h2><ul><li><a href="#/vender">Cómo funciona</a></li><li data-install${canInstall() ? '' : ' hidden'}><button type="button" class="linkbtn foot-inst" data-act="install">Instalar la app</button></li>${contact}${ig}<li><a href="#/${S.user ? 'cuenta' : 'entrar'}">${S.user ? 'Mi cuenta' : 'Entrar'}</a></li></ul></div>
   </div><div class="legal"><span>© ${year} ${esc(C.appName)}</span><span>${T('foot.legal', 'La compra se realiza en la tienda de cada marca.')}</span>
@@ -930,7 +961,7 @@ function ranked(list) {
 }
 function applyFilters(list) {
   const q = S.q.trim().toLowerCase();
-  return list.filter(p => (S.cat === 'Todo' || p.cat === S.cat) && (S.style === 'Todos' || p.tags.includes(S.style)) && (!S.onlyMine || fitsMe(p) !== false) && (!q ||(p.name + ' ' + p.brand + ' ' + p.tags.join(' ') + ' ' + p.cat).toLowerCase().includes(q)));
+  return list.filter(p => (!S.cats.length || S.cats.includes(p.cat)) && (S.style === 'Todos' || p.tags.includes(S.style)) && (!S.onlyMine || fitsMe(p) !== false) && (!q ||(p.name + ' ' + p.brand + ' ' + p.tags.join(' ') + ' ' + p.cat).toLowerCase().includes(q)));
 }
 
 /* marcas a partir de los productos publicados */
@@ -1023,12 +1054,24 @@ VIEWS.inicio = () => {
 
 /* --- Directorio de marcas --- */
 VIEWS.marcas = () => {
+  // v24 · portada: marcas en tarjetas grandes con foto y su nombre encima
   const brands = brandList();
-  view.innerHTML = `<div class="wrap page has-tabbar">
-    <div class="pagehead"><div><span class="eyebrow">${T('dir.eyebrow', 'Directorio')}</span><h1 style="margin-top:12px">${T('dir.title', 'Marcas')}</h1><p class="muted">${T('dir.text', 'Todas las marcas independientes que ya están en ' + C.appName + '.')}</p></div>
-      ${isBrand() ? '' : '<a class="btn small" href="#/vender">Únete como marca</a>'}</div>
-    <div class="brandgrid">${brands.length ? brands.map(brandCardHTML).join('') : '<div class="empty">Aún no hay marcas con prendas publicadas.<br><a class="btn" href="#/vender">Sé la primera</a></div>'}</div></div>`;
+  const hello = hasTaste() ? '' : `<button class="mtest" data-act="gustos"><b>${T('home.cta1', 'Haz el test de estilo')}</b><span>${T('home.ctasub', 'Gratis · 1 minuto · sin registrarte')}</span><span class="arr" aria-hidden="true">→</span></button>`;
+  view.innerHTML = `<div class="wrap page has-tabbar mhome">
+    <div class="mhead"><h1>${T('dir.title', 'Marcas')}</h1>${catSquare('marcas')}</div>
+    ${hello}
+    <div class="mgrid">${brands.length ? brands.map(brandTileHTML).join('') : '<div class="empty">Aún no hay marcas con prendas publicadas.<br><a class="btn" href="#/vender">Sé la primera</a></div>'}</div>
+    ${isBrand() ? '' : `<div class="hband" style="margin-top:28px"><div><b>${T('band.title', '¿Tienes una marca? Publica en ' + C.appName + '.')}</b><span>${T('band.text', 'Los compradores con tu estilo te encuentran. La venta se hace en tu propia tienda.')}</span></div><a class="bandlink" href="#/vender">${T('band.cta2', 'Saber más')} <span aria-hidden="true">→</span></a></div>`}
+  </div>`;
 };
+// tarjeta grande de marca: portada (o la foto de una de sus prendas) y el nombre en grande
+function brandTileHTML(b) {
+  const withPic = b.items.find(p => p.image);
+  const bg = b.cover ? `<img src="${esc(b.cover)}" alt="" loading="lazy">` : withPic ? `<img src="${esc(withPic.image)}" alt="" loading="lazy">` : `<span class="mt-art" style="background:${tileBg(b.items[0])}">${pic(b.items[0])}</span>`;
+  return `<a class="mtile" href="#/marca/${esc(b.id)}" style="--bc:${esc(b.color)}">${bg}<span class="mt-shade" aria-hidden="true"></span>
+    ${b.logo ? `<span class="mt-logo"><img src="${esc(b.logo)}" alt=""></span>` : ''}
+    <span class="mt-name">${esc(b.name)}</span><span class="mt-n">${b.items.length} ${b.items.length === 1 ? 'prenda' : 'prendas'}</span></a>`;
+}
 
 /* --- Vende en FOUND --- */
 VIEWS.vender = () => {
@@ -1162,7 +1205,7 @@ VIEWS.descubrir = () => {
     <div class="reeltop" role="group" aria-label="Filtros">
       <button class="chip" data-act="gustos">${hasTaste() ? 'Mis gustos' : 'Personalizar'}</button>
       ${hasSizes() ? `<button class="chip" data-act="onlymine" data-v="${S.onlyMine ? 0 : 1}" aria-pressed="${S.onlyMine}" title="Solo prendas en tu talla (${esc(mySizesLabel())})">Mi talla</button>` : ''}
-      ${['Todo', ...C.categories].map(c => `<button class="chip" data-act="cat" data-v="${esc(c)}" aria-pressed="${S.cat === c}">${esc(c)}</button>`).join('')}
+      ${catSquare('feed')}
     </div>
     ${N ? `<div class="count" id="cnt" aria-hidden="true">1 / ${N}</div>` : ''}
   </div>
@@ -1192,7 +1235,7 @@ VIEWS.explorar = () => {
       </select>
     </div>
     <div class="filters">
-      <div class="frow"><span>Prenda</span><div class="chips" role="group" aria-label="Categorías">${['Todo', ...C.categories].map(c => `<button class="chip" data-act="cat" data-v="${esc(c)}" aria-pressed="${S.cat === c}">${esc(c)}</button>`).join('')}</div></div>
+      <div class="frow"><span>Prenda</span><div class="chips" role="group" aria-label="Categorías">${['Todo', ...C.categories].map(c => `<button class="chip" data-act="cat" data-v="${esc(c)}" aria-pressed="${c === 'Todo' ? !S.cats.length : S.cats.includes(c)}">${esc(c)}</button>`).join('')}</div></div>
       <div class="frow"><span>Estilo</span><div class="chips" role="group" aria-label="Estilos">${['Todos', ...C.styles].map(c => `<button class="chip" data-act="fstyle" data-v="${esc(c)}" aria-pressed="${S.style === c}">${esc(c)}</button>`).join('')}</div></div>
       <div class="frow"><span>Talla</span><div class="chips" role="group" aria-label="Talla">${hasSizes()
         ? `<button class="chip" data-act="onlymine" data-v="1" aria-pressed="${S.onlyMine}">Solo mi talla · ${esc(mySizesLabel())}</button><button class="chip" data-act="onlymine" data-v="0" aria-pressed="${!S.onlyMine}">Todas las tallas</button><button class="chip ghostchip" data-act="gustos">Cambiar mi talla</button>`
@@ -1212,9 +1255,9 @@ function fillGrid() {
 /* --- Guardados --- */
 VIEWS.guardados = () => {
   const list = ranked(S.products.filter(p => S.favs.has(p.id)));
-  view.innerHTML = `<div class="wrap page has-tabbar"><div class="pagehead"><div><span class="eyebrow">${T('fav.eyebrow', 'Tu selección')}</span><h1 style="margin-top:12px">${T('fav.title', 'Guardados')}</h1><p class="muted">${list.length ? list.length + (list.length === 1 ? ' prenda guardada.' : ' prendas guardadas.') : 'Las prendas que guardes aparecerán aquí.'}</p></div></div>
+  view.innerHTML = `<div class="wrap page has-tabbar"><div class="pagehead"><div><span class="eyebrow">${T('fav.eyebrow', 'Tu selección')}</span><h1 style="margin-top:12px">${T('fav.title', 'Favoritas')}</h1><p class="muted">${list.length ? list.length + (list.length === 1 ? ' prenda guardada.' : ' prendas guardadas.') : 'Las prendas que guardes aparecerán aquí.'}</p></div></div>
     ${!S.user && list.length ? `<div class="card-box" style="margin-bottom:20px"><b>Crea una cuenta para no perder tus guardados.</b> <a href="#/entrar">Entrar o registrarme</a></div>` : ''}
-    <div class="grid">${list.length ? list.map(cardHTML).join('') : `<div class="empty">Aún no has guardado nada.<br>Toca el corazón en las prendas que te gusten.<br><a class="btn" href="#/descubrir">Ir a descubrir</a></div>`}</div></div>`;
+    <div class="grid">${list.length ? list.map(cardHTML).join('') : `<div class="empty">Aún no has guardado nada.<br>Toca el corazón en las prendas que te gusten.<br><a class="btn" href="#/feed">Ir al feed</a></div>`}</div></div>`;
 };
 
 /* --- Perfil público de marca --- */
@@ -1249,7 +1292,7 @@ VIEWS.gustos = () => {
     <div class="qblock"><h2><small>04</small>Tu talla</h2><p>Opcional. Si estás entre dos, marca las dos. Así no te enseñamos prendas que no quedan en tu talla.</p>
       ${szRow('Ropa', SIZES_ROPA)}${szRow('Calzado (EU)', SIZES_PIE)}</div>
     <p class="msg err" id="qerr" role="alert"></p>
-    <div class="qacts"><button class="btn" data-act="apply">Guardar mis gustos <span class="arr">→</span></button><a class="btn ghost" href="#/descubrir">Cancelar</a></div>
+    <div class="qacts"><button class="btn" data-act="apply">Guardar mis gustos <span class="arr">→</span></button><a class="btn ghost" href="#/feed">Cancelar</a></div>
   </div></div>`;
 };
 
@@ -2341,7 +2384,7 @@ function openProduct(id) {
   const buy = isUrl(p.buy_url)
     ? `<a class="btn" href="${esc(p.buy_url)}" target="_blank" rel="noopener noreferrer" data-track="buy" data-id="${esc(p.id)}">Comprar en la tienda de ${esc(p.brand)}</a>`
     : (p.contact ? `<a class="btn" data-track="buy" data-id="${esc(p.id)}" href="mailto:${esc(p.contact)}?subject=${encodeURIComponent('Me interesa: ' + p.name)}">Preguntar a ${esc(p.brand)}</a>` : '<span class="muted">Esta marca aún no ha añadido un enlace de compra.</span>');
-  dlg.innerHTML = `<div style="position:relative"><span class="grab" aria-hidden="true"></span><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button>
+  dlg.classList.remove("catdlg"); dlg.innerHTML = `<div style="position:relative"><span class="grab" aria-hidden="true"></span><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button>
     <div class="dgrid"><div class="art" style="background:${tileBg(p)}">${galleryHTML(p)}${m !== null ? `<span class="hang">${m} % para ti</span>` : ''}</div>
     <div class="dinfo">
       <a href="#/marca/${esc(p.brand_id)}" data-act="closeDlg" class="muted dbrand">${miniLogo(p.logo)}${esc(p.brand)}</a>
@@ -2399,6 +2442,7 @@ function closeDlg() {
   setTimeout(() => { dlg.close(); dlg.classList.remove('closing'); dlg.style.transform = ''; dlg.style.transition = ''; }, 280);
 }
 dlg.addEventListener('click', e => { if (e.target === dlg) closeDlg(); });
+dlg.addEventListener('close', () => dlg.classList.remove('catdlg'));
 dlg.addEventListener('cancel', e => { if (sheetMode()) { e.preventDefault(); closeDlg(); } });
 dlg.addEventListener('close', () => { if (S.route) routeMeta(S.route, (location.hash.split('/')[2] || '')); });
 
@@ -2467,18 +2511,27 @@ function syncFavUI(id) {
     if (b.classList.contains('btn')) b.textContent = on ? 'Quitar de guardados' : 'Guardar';
   });
 }
+// número de favoritas en la pestaña, sin volver a pintar toda la cabecera
+function favBadge() {
+  document.querySelectorAll('a[href="#/guardados"]').forEach(a => {
+    let c = a.querySelector('.tabc');
+    if (!S.favs.size) { if (c) c.remove(); return; }
+    if (!c) { c = document.createElement('span'); c.className = 'tabc'; a.appendChild(c); }
+    c.textContent = S.favs.size; c.setAttribute('aria-label', S.favs.size + ' favoritas');
+  });
+}
 async function toggleFav(id, forceOn) {
   const on = forceOn === undefined ? !S.favs.has(id) : forceOn;
   if (on === S.favs.has(id)) return;
   on ? S.favs.add(id) : S.favs.delete(id);
-  syncFavUI(id);
+  syncFavUI(id); favBadge();
   try {
     if (S.user) await api.setFav(S.user.id, id, on);
     else lsSet('found_guest_favs', [...S.favs]);
-    toast(on ? 'Guardado' : 'Quitado de guardados');
+    toast(on ? 'Añadida a favoritas' : 'Quitada de favoritas');
     if (S.route === 'guardados' && !dlg.open) VIEWS.guardados();
   } catch (e) {
-    on ? S.favs.delete(id) : S.favs.add(id); syncFavUI(id); toast('No se pudo guardar: ' + e.message);
+    on ? S.favs.delete(id) : S.favs.add(id); syncFavUI(id); favBadge(); toast('No se pudo guardar: ' + e.message);
   }
 }
 document.addEventListener('click', async e => {
@@ -2492,12 +2545,16 @@ document.addEventListener('click', async e => {
     case 'gal': galGo(+v); break;
     case 'galto': galGo(+v, true); break;
     case 'fav': toggleFav(id); break;
-    case 'cat': S.cat = v; VIEWS[S.route] && VIEWS[S.route](); break;
+    case 'cats': openCats(v); break;
+    case 'catpick': catDraft = catDraft.includes(v) ? catDraft.filter(c => c !== v) : [...catDraft, v]; renderCats(); break;
+    case 'catclear': catDraft = []; renderCats(); break;
+    case 'catok': S.cats = [...catDraft]; S.q = ''; closeDlg(); if (S.route === 'descubrir') { renderNav(); VIEWS.descubrir(); } else go('feed'); break;
+    case 'cat': S.cats = v === 'Todo' ? [] : (S.cats.includes(v) ? S.cats.filter(c => c !== v) : [...S.cats, v]); VIEWS[S.route] && VIEWS[S.route](); break;
     case 'gustos': S.draft = null; go('gustos'); break;
-    case 'style': S.cat = 'Todo'; S.q = ''; S.style = v; go('explorar'); break;
+    case 'style': S.cats = []; S.q = ''; S.style = v; go('explorar'); break;
     case 'fstyle': S.style = v; VIEWS.explorar(); break;
-    case 'gocat': e.preventDefault(); S.cat = v; S.style = 'Todos'; S.q = ''; if (S.route === 'explorar') { renderNav(); VIEWS.explorar(); } else go('explorar'); break;
-    case 'editon': if (!isAdmin()) break; S.editMode = true; if (S.route === 'admin') go('inicio'); else rerender(); toast('Modo edición activado. Solo tú lo ves.'); break;
+    case 'gocat': e.preventDefault(); S.cats = [v]; S.style = 'Todos'; S.q = ''; if (S.route === 'explorar') { renderNav(); VIEWS.explorar(); } else go('explorar'); break;
+    case 'editon': if (!isAdmin()) break; S.editMode = true; if (S.route === 'admin') go('marcas'); else rerender(); toast('Modo edición activado. Solo tú lo ves.'); break;
     case 'editoff': if (pendingCount() && !b.dataset.sure) { b.dataset.sure = '1'; b.textContent = 'Tienes cambios sin publicar. ¿Salir igual?'; break; }
       S.editMode = false; S.colorsOpen = false; S.textDraft = {}; S.colorDraft = null; S.resetTexts = false; applySettings(S.settings); renderNav(); rerender(); break;
     case 'colors': S.colorsOpen = !S.colorsOpen; renderEditBar(); break;
@@ -2522,7 +2579,7 @@ document.addEventListener('click', async e => {
       S.taste = { styles: [...S.draft.styles], cats: [...S.draft.cats], budget: S.draft.budget, sizes: sortSizes(S.draft.sizes || []) };
       lsSet('found_taste', S.taste); S.draft = null; S.onlyMine = true; logSite('test');
       if (S.user) { try { await api.saveProfile(S.user.id, { styles: S.taste.styles, cats: S.taste.cats, budget: S.taste.budget, sizes: S.taste.sizes });S.profile = { ...S.profile, ...S.taste }; } catch (err) { toast('Tus gustos se guardaron en este dispositivo, pero no en tu cuenta: ' + err.message); } }
-      toast('Gustos guardados'); go('descubrir'); break; }
+      toast('Gustos guardados'); go('feed'); break; }
     case 'authmode': S.authMode = v; VIEWS.entrar(); break;
     case 'authrole': S.authRole = v; VIEWS.entrar(); break;
     case 'logout': stopChatWatch(); S.chat = { brand: null, product: null, draft: '', thread: [] }; S.billing = null; S.editMode = false; S.textDraft = {}; S.colorDraft = null; await api.signOut(); S.user = null; S.profile = null; S.favs = guestFavs(); S.editing = null; renderNav(); toast('Has cerrado sesión'); go('inicio'); break;
@@ -2663,7 +2720,7 @@ function productLD(p) {
   };
 }
 function routeMeta(name, arg) {
-  const cat = S.cat && S.cat !== 'Todo' ? S.cat : '';
+  const cat = S.cats.length === 1 ? S.cats[0] : '';
   switch (name) {
     case 'inicio': return setMeta('', DEF_DESC, { ld: S.products.length ? { '@type': 'ItemList', name: 'Prendas destacadas', itemListElement: ranked(S.products).slice(0, 10).map((p, i) => ({ '@type': 'ListItem', position: i + 1, item: productLD(p) })) } : null });
     case 'descubrir': return setMeta('Descubrir prendas para ti', 'Desliza y descubre prendas de marcas independientes ordenadas según tu estilo, tu talla y tu presupuesto.');
@@ -2690,11 +2747,11 @@ VIEWS['404'] = () => {
     <h1>Esta página se nos ha <em>descosido</em>.</h1>
     <p class="lead muted">El enlace no existe o la prenda ya no está disponible. Busca otra cosa o vuelve al inicio.</p>
     <form class="nf-search" role="search" data-nf><label class="sr" for="nfq">Buscar prendas</label><input id="nfq" type="search" placeholder="Busca prendas, marcas o estilos" autocomplete="off"><button class="btn" type="submit">Buscar</button></form>
-    <p><a href="#/inicio">Volver al inicio</a></p></section></div>`;
+    <p><a href="#/marcas">Volver al inicio</a></p></section></div>`;
 };
 document.addEventListener('submit', e => {
   if (!e.target.matches('[data-nf]')) return;
-  e.preventDefault(); S.q = $('#nfq').value; S.cat = 'Todo'; S.style = 'Todos'; go('explorar');
+  e.preventDefault(); S.q = $('#nfq').value; S.cats = []; S.style = 'Todos'; go('explorar');
 });
 
 /* --- botón flotante de WhatsApp --- */
@@ -2742,7 +2799,7 @@ function openIOSInstall() {
 // tarjeta discreta en el móvil a partir de la segunda visita (se puede cerrar y no vuelve en 30 días)
 function maybeInstallCard() {
   const old = $('#instcard'); if (old) old.remove();
-  if (!canInstall() || !matchMedia('(max-width:820px)').matches || S.route !== 'inicio') return;
+  if (!canInstall() || !matchMedia('(max-width:820px)').matches || S.route !== 'marcas') return;
   if (window.FOUND_CONSENT && !window.FOUND_CONSENT.decided()) return;
   const visits = Number(lsGet('found_visits', 0)), hid = Number(lsGet('found_inst_hide', 0));
   if (visits < 2 || Date.now() - hid < 30 * 864e5) return;
@@ -2794,11 +2851,13 @@ function route() {
   // anclas internas (por ejemplo «Saltar al contenido») no cambian de pantalla
   if (location.hash && !/^#\//.test(location.hash) && S.route) return;
   const h = /^#\//.test(location.hash) ? location.hash.slice(2) : '';
-  const [name, arg] = (h || 'inicio').split('/');
-  S.route = VIEWS[name] && name !== '404' ? name : (h ? '404' : 'inicio');
+  let [name, arg] = (h || 'marcas').split('/');
+  name = { inicio: 'marcas', feed: 'descubrir', favoritas: 'guardados' }[name] || name;
+  S.route = VIEWS[name] && name !== '404' ? name : (h ? '404' : 'marcas');
   document.body.classList.remove('noscroll');
   if (S.route !== 'explorar') { S.q = ''; S.style = 'Todos'; }
   if (dlg.open) dlg.close();
+  dlg.classList.remove('catdlg');
   if (S.route !== 'gustos') S.draft = S.route === 'panel' ? S.draft : null;
   if (S.route !== 'panel') { S.editing = null; if (S.route !== 'gustos') { S.formTags = []; S.formSizes = []; clearPhotos(); } }
   renderNav();
@@ -2824,7 +2883,7 @@ document.addEventListener('change', e => { if (e.target.id === 'f-imgs') { addPh
 document.addEventListener('submit', e => {
   if (e.target.id !== 'hsearch') return;
   e.preventDefault();
-  S.q = $('#hq').value; S.cat = 'Todo'; S.style = 'Todos';
+  S.q = $('#hq').value; S.cats = []; S.style = 'Todos';
   if (S.route === 'explorar') { renderNav(); VIEWS.explorar(); } else go('explorar');
   logSearchSoon();
 });
@@ -2834,7 +2893,7 @@ document.addEventListener('submit', e => {
   // enlaces compartidos: ?p=ID abre la prenda, ?m=ID abre la página de la marca
   const qs = new URLSearchParams(location.search), sharedP = qs.get('p'), sharedM = qs.get('m'), sharedQ = qs.get('q');
   if (sharedQ && !sharedP && !sharedM) { S.q = sharedQ.slice(0, 80); history.replaceState(null, '', location.pathname + '#/explorar'); }
-  if (sharedP || sharedM) history.replaceState(null, '', location.pathname + (sharedM ? '#/marca/' + encodeURIComponent(sharedM) : (location.hash || '#/inicio')));
+  if (sharedP || sharedM) history.replaceState(null, '', location.pathname + (sharedM ? '#/marca/' + encodeURIComponent(sharedM) : (location.hash || '#/marcas')));
   if (configured && !hasLib) toast('No se pudo cargar Supabase. Revisa tu conexión y recarga la página.');
   try { await afterAuth(); } catch (e) { S.favs = guestFavs(); toast('No se pudo comprobar tu sesión: ' + e.message); }
   try { applySettings(await api.getSettings()); } catch { applySettings(null); }

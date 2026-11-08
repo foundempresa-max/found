@@ -1646,3 +1646,83 @@ button,[role="button"],.heart,.tile,.hpic,.stylecard,.brandcard{touch-action:man
 .top{background:color-mix(in srgb,var(--surface) 72%,transparent);-webkit-backdrop-filter:blur(20px) saturate(180%);backdrop-filter:blur(20px) saturate(180%)}
 body.scrolled .top{box-shadow:none}
 @media (prefers-reduced-transparency: reduce){.top{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none}body.scrolled .top{box-shadow:0 1px 0 rgba(20,20,20,.06)}}
+
+/* ==========================================================
+   v24 · cuatro páginas (Marcas, Feed, Favoritas, Mi cuenta),
+   pestaña activa en lima, marcas con foto grande y el cuadrado de prendas
+   ========================================================== */
+:root{--lime:#DDF08A;--lime-ink:#1A1F0A}
+/* barra inferior (móvil) */
+@media (max-width:820px){
+  :root{--tab-h:72px}
+  .tabbar{background:#F7F6EF;padding-left:10px;padding-right:10px;gap:6px}
+  .tabbar a{position:relative;margin:8px 0;border-radius:12px;font-size:12px;font-weight:600;color:var(--ink);gap:5px;transition:background-color 140ms ease}
+  .tabbar a[aria-current="page"]{background:var(--lime);color:var(--lime-ink);font-weight:700}
+  .tabbar a[aria-current="page"] svg{stroke:var(--lime-ink)}
+  .tabbar a svg{width:24px;height:24px;stroke-width:1.8}
+  .tabbar a:active{transform:scale(.97)}
+}
+.tabc{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#E7E6DE;color:var(--ink);font-size:11px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.tabbar a .tabc{position:absolute;top:4px;left:calc(50% + 12px)}
+.tabbar a .navn{top:4px;left:calc(50% + 10px)}
+/* menú del ordenador: las mismas cuatro páginas, la activa en lima */
+.hcats{gap:6px;align-items:center}
+.hcats a{height:36px;padding:0 16px;border-radius:10px;border-bottom:0!important;font-size:15px;color:var(--ink);gap:6px;transition:background-color 140ms ease}
+.hcats a[aria-current="page"]{background:var(--lime);color:var(--lime-ink);font-weight:700}
+@media (hover:hover) and (pointer:fine){.hcats a:not([aria-current="page"]):hover{background:color-mix(in srgb,var(--ink) 6%,transparent)}}
+
+/* el cuadrado de prendas */
+.catsq{flex:none;display:grid;justify-items:center;align-content:center;gap:4px;width:76px;height:76px;padding:0;border:1px solid var(--line,#E4E2DA);border-radius:16px;background:var(--surface);color:var(--ink);cursor:pointer;font:inherit;position:relative;transition:transform 140ms cubic-bezier(.23,1,.32,1),background-color 140ms ease}
+.catsq:active{transform:scale(.96)}
+.catsq.on{background:var(--lime);border-color:transparent;color:var(--lime-ink)}
+.catsq-ic{position:relative;display:block;width:24px;height:24px}
+.catsq-ic svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.catsq-ic i{position:absolute;top:-8px;right:-14px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:var(--ink);color:#fff;font-style:normal;font-size:11px;font-weight:700;display:grid;place-items:center}
+.catsq-tx b{font-size:13px;font-weight:700}
+.catsq-tx small{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.reeltop{align-items:flex-start}
+.reeltop .catsq{width:64px;height:64px;border:0;border-radius:14px;background:rgba(255,255,255,.92);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.reeltop .catsq.on{background:var(--lime)}
+
+/* panel para elegir prendas */
+dialog#dlg.catdlg{max-width:560px}
+.catpick{position:relative;padding:34px 20px 0}
+.catpick h2{margin:6px 0 2px;font-size:26px;letter-spacing:-.03em}
+.catpick>p{margin:0 0 16px}
+.catgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+@media (max-width:380px){.catgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.catopt{display:grid;justify-items:center;gap:2px;padding:14px 6px 12px;border:1.5px solid transparent;border-radius:14px;background:#F2F1EA;color:var(--ink);font:inherit;cursor:pointer;transition:transform 140ms cubic-bezier(.23,1,.32,1),background-color 140ms ease,border-color 140ms ease}
+.catopt:active{transform:scale(.97)}
+.catopt[aria-pressed="true"]{background:var(--lime);border-color:var(--lime-ink)}
+.catopt b{font-size:14.5px;font-weight:700}
+.catopt small{font-size:12.5px;color:var(--muted)}
+.catopt[aria-pressed="true"] small{color:var(--lime-ink)}
+.catart{width:46px;height:50px;display:block;margin-bottom:4px}
+.catart svg{width:100%;height:100%;fill:color-mix(in srgb,var(--ink) 10%,transparent);stroke:var(--ink);stroke-width:2.2;stroke-linejoin:round}
+.catacts{position:sticky;bottom:0;display:flex;gap:8px;margin:18px -20px 0;padding:12px 20px calc(16px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line,#E4E2DA)}
+.catacts .btn{flex:1;justify-content:center}
+.catacts .btn.ghost{flex:0 0 auto}
+
+/* Marcas: la portada */
+.mhome{padding-top:20px}
+.mhead{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:18px}
+.mhead h1{margin:0;font-size:clamp(40px,9vw,64px);line-height:.92;letter-spacing:-.045em}
+.mtest{display:flex;align-items:center;gap:6px 12px;flex-wrap:wrap;width:100%;margin:0 0 18px;padding:14px 16px;border:0;border-radius:14px;background:var(--lime);color:var(--lime-ink);font:inherit;text-align:left;cursor:pointer;transition:transform 140ms cubic-bezier(.23,1,.32,1)}
+.mtest:active{transform:scale(.98)}
+.mtest b{font-size:16px}
+.mtest span:not(.arr){font-size:14px;opacity:.8}
+.mtest .arr{margin-left:auto;font-size:18px}
+.mgrid{display:grid;grid-template-columns:1fr;gap:12px}
+@media (min-width:700px){.mgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1100px){.mgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.mtile{position:relative;display:block;aspect-ratio:4/3;overflow:hidden;border-radius:6px;background:var(--bc,#DCD6CA);color:#fff;text-decoration:none;transition:transform 160ms cubic-bezier(.23,1,.32,1)}
+.mtile:active{transform:scale(.985)}
+.mtile>img,.mtile .mt-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:flex;align-items:center;justify-content:center}
+.mtile .mt-art>*{max-width:70%;max-height:85%}
+.mt-shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.55),rgba(0,0,0,0) 55%)}
+.mt-name{position:absolute;left:18px;right:18px;bottom:34px;font-size:clamp(36px,9vw,58px);font-weight:800;line-height:.9;letter-spacing:-.035em;overflow-wrap:anywhere;text-shadow:0 1px 18px rgba(0,0,0,.25)}
+.mt-n{position:absolute;left:18px;bottom:12px;font-size:13px;font-weight:600;opacity:.9;font-variant-numeric:tabular-nums}
+.mt-logo{position:absolute;top:12px;left:12px;width:40px;height:40px;border-radius:999px;overflow:hidden;background:#fff}
+.mt-logo img{width:100%;height:100%;object-fit:cover}
+@media (hover:hover) and (pointer:fine){.mtile>img{transition:transform 400ms cubic-bezier(.23,1,.32,1)}.mtile:hover>img{transform:scale(1.03)}}
+@media (prefers-reduced-motion:reduce){.mtile:active,.catopt:active,.catsq:active,.mtest:active{transform:none}}
