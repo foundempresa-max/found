@@ -989,8 +989,6 @@ VIEWS.inicio = () => {
       <div class="hpics">${heroPics}</div>
     </section>
 
-    <div class="mcats chips" role="group" aria-label="Categorías">${C.categories.map(c => `<a class="chip" href="#/explorar" data-act="gocat" data-v="${esc(c)}">${esc(c)}</a>`).join('')}</div>
-
     <section class="hsec">
       ${head(hasTaste() ? 'Para ti' : T('feat.title', 'Lo más destacado'), '#/explorar', 'Ver todo', sizeChip)}
       ${top.length ? `<div class="grid">${top.slice(0, 10).map(cardHTML).join('')}</div>`
