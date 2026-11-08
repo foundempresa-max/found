@@ -645,7 +645,7 @@ const api = configured && hasLib ? supabaseApi() : demoApi();
 const S = {
   user: null, profile: null, products: [], allProducts: [], favs: new Set(), counts: {},
   taste: lsGet('found_taste', null),
-  cats: [], style: 'Todos', q: '', sort: 'match', authMode: 'in', authRole: 'buyer',
+  cats: [], maxPrice: null, style: 'Todos', q: '', sort: 'match', authMode: 'in', authRole: 'buyer',
   formTags: [], formSizes: [], formPhotos: [], onlyMine: true, editing: null, draft: null, settings: null, adminTab: 'resumen', siteDays: 30, rankDays: 30,
   billing: null, ev: {}, statsDays: 30, editMode: false, textDraft: {}, colorDraft: null, colorsOpen: false, resetTexts: false,
   unread: 0, chat: { brand: null, product: null, draft: '', thread: [] }
@@ -889,11 +889,30 @@ function renderNav() {
 }
 /* ---------- cuadrado de categorías: se toca y se eligen una o varias prendas ---------- */
 const catLabel = () => !S.cats.length ? 'Todas las prendas' : S.cats.length <= 2 ? S.cats.join(' y ') : S.cats.length + ' tipos de prenda';
-function catSquare(where) {
-  return `<button type="button" class="catsq${S.cats.length ? ' on' : ''}" data-act="cats" data-v="${where}" aria-haspopup="dialog">
-    <span class="catsq-ic" aria-hidden="true">${ICON.grid}${S.cats.length ? `<i>${S.cats.length}</i>` : ''}</span>
-    <span class="catsq-tx"><b>Prendas</b><small>${esc(catLabel())}</small></span></button>`;
+// v24.2 · barra de filtros: «Prendas» (desplegable) y «Precio máximo» (barra deslizante)
+const priceTop = () => Math.max(50, Math.ceil(Math.max(0, ...S.products.map(p => Number(p.price) || 0)) / 50) * 50);
+const priceOk = p => S.maxPrice == null || Number(p.price) <= S.maxPrice;
+function filterBar(where) {
+  const top = priceTop(), v = S.maxPrice == null ? top : Math.min(S.maxPrice, top);
+  return `<div class="fbar" role="group" aria-label="Filtros">
+    <button type="button" class="fsel${S.cats.length ? ' on' : ''}" data-act="cats" data-v="${where}" aria-haspopup="dialog" aria-label="Prendas: ${esc(catLabel())}"><span><small>Prendas</small>${esc(!S.cats.length ? 'Todas' : S.cats.length === 1 ? S.cats[0] : S.cats.length + ' tipos')}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="fprice"><div class="fp-top"><label for="fprice">Precio máximo</label><b id="fprice-v">${money(v)}</b></div>
+      <input type="range" id="fprice" min="0" max="${top}" step="5" value="${v}" aria-valuetext="${money(v)}">
+      <div class="fp-ends" aria-hidden="true"><span>${money(0)}</span><span>${money(top)}</span></div></div>
+  </div>`;
 }
+// la barra de precio: el número cambia mientras arrastras y la lista se actualiza al soltar
+document.addEventListener('input', e => {
+  if (e.target.id !== 'fprice') return;
+  const v = Number(e.target.value), o = $('#fprice-v');
+  if (o) o.textContent = money(v); e.target.setAttribute('aria-valuetext', money(v));
+});
+document.addEventListener('change', e => {
+  if (e.target.id !== 'fprice') return;
+  const v = Number(e.target.value);
+  S.maxPrice = v >= priceTop() ? null : v;
+  if (VIEWS[S.route]) VIEWS[S.route]();
+});
 let catDraft = [], catFrom = 'feed';
 function openCats(from) {
   catFrom = from || 'feed'; catDraft = [...S.cats];
@@ -902,7 +921,7 @@ function openCats(from) {
   if (!dlg.open) dlg.showModal();
 }
 function renderCats() {
-  const n = S.products.filter(p => (!S.onlyMine || fitsMe(p) !== false) && (!catDraft.length || catDraft.includes(p.cat))).length;
+  const n = S.products.filter(p => (!S.onlyMine || fitsMe(p) !== false) && priceOk(p) && (!catDraft.length || catDraft.includes(p.cat))).length;
   dlg.innerHTML = `<div class="catpick"><span class="grab" aria-hidden="true"></span><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button>
     <h2>¿Qué buscas?</h2><p class="muted">Elige una o varias.</p>
     <div class="catgrid" role="group" aria-label="Tipos de prenda">${C.categories.map(c => {
@@ -961,13 +980,13 @@ function ranked(list) {
 }
 function applyFilters(list) {
   const q = S.q.trim().toLowerCase();
-  return list.filter(p => (!S.cats.length || S.cats.includes(p.cat)) && (S.style === 'Todos' || p.tags.includes(S.style)) && (!S.onlyMine || fitsMe(p) !== false) && (!q ||(p.name + ' ' + p.brand + ' ' + p.tags.join(' ') + ' ' + p.cat).toLowerCase().includes(q)));
+  return list.filter(p => (!S.cats.length || S.cats.includes(p.cat)) && (S.maxPrice == null || Number(p.price) <= S.maxPrice) && (S.style === 'Todos' || p.tags.includes(S.style)) && (!S.onlyMine || fitsMe(p) !== false) && (!q ||(p.name + ' ' + p.brand + ' ' + p.tags.join(' ') + ' ' + p.cat).toLowerCase().includes(q)));
 }
 
 /* marcas a partir de los productos publicados */
-function brandList() {
+function brandList(list = S.products) {
   const m = new Map();
-  S.products.forEach(p => {
+  list.forEach(p => {
     if (!m.has(p.brand_id)) m.set(p.brand_id, { id: p.brand_id, name: p.brand, bio: p.bio, contact: p.contact, logo: p.logo, cover: p.cover, items: [], color: p.color });
     m.get(p.brand_id).items.push(p);
   });
@@ -1055,12 +1074,14 @@ VIEWS.inicio = () => {
 /* --- Directorio de marcas --- */
 VIEWS.marcas = () => {
   // v24 · portada: marcas en tarjetas grandes con foto y su nombre encima
-  const brands = brandList();
+  const filtered = S.cats.length || S.maxPrice != null;
+  const brands = brandList(S.products.filter(p => (!S.cats.length || S.cats.includes(p.cat)) && priceOk(p)));
   const hello = hasTaste() ? '' : `<button class="mtest" data-act="gustos"><b>${T('home.cta1', 'Haz el test de estilo')}</b><span>${T('home.ctasub', 'Gratis · 1 minuto · sin registrarte')}</span><span class="arr" aria-hidden="true">→</span></button>`;
   view.innerHTML = `<div class="wrap page has-tabbar mhome">
-    <div class="mhead"><h1>${T('dir.title', 'Marcas')}</h1>${catSquare('marcas')}</div>
+    <div class="mhead"><h1>${T('dir.title', 'Marcas')}</h1></div>
+    ${filterBar('marcas')}
     ${hello}
-    <div class="mgrid">${brands.length ? brands.map(brandTileHTML).join('') : '<div class="empty">Aún no hay marcas con prendas publicadas.<br><a class="btn" href="#/vender">Sé la primera</a></div>'}</div>
+    <div class="mgrid">${brands.length ? brands.map(brandTileHTML).join('') : filtered ? '<div class="empty">Ninguna marca tiene prendas con estos filtros.<br><button class="btn small" data-act="fclear">Quitar filtros</button></div>' : '<div class="empty">Aún no hay marcas con prendas publicadas.<br><a class="btn" href="#/vender">Sé la primera</a></div>'}</div>
     ${isBrand() ? '' : `<div class="hband" style="margin-top:28px"><div><b>${T('band.title', '¿Tienes una marca? Publica en ' + C.appName + '.')}</b><span>${T('band.text', 'Los compradores con tu estilo te encuentran. La venta se hace en tu propia tienda.')}</span></div><a class="bandlink" href="#/vender">${T('band.cta2', 'Saber más')} <span aria-hidden="true">→</span></a></div>`}
   </div>`;
 };
@@ -1205,7 +1226,7 @@ VIEWS.descubrir = () => {
     <div class="reeltop" role="group" aria-label="Filtros">
       <button class="chip" data-act="gustos">${hasTaste() ? 'Mis gustos' : 'Personalizar'}</button>
       ${hasSizes() ? `<button class="chip" data-act="onlymine" data-v="${S.onlyMine ? 0 : 1}" aria-pressed="${S.onlyMine}" title="Solo prendas en tu talla (${esc(mySizesLabel())})">Mi talla</button>` : ''}
-      ${catSquare('feed')}
+      ${filterBar('feed')}
     </div>
     ${N ? `<div class="count" id="cnt" aria-hidden="true">1 / ${N}</div>` : ''}
   </div>
@@ -2548,7 +2569,8 @@ document.addEventListener('click', async e => {
     case 'cats': openCats(v); break;
     case 'catpick': catDraft = catDraft.includes(v) ? catDraft.filter(c => c !== v) : [...catDraft, v]; renderCats(); break;
     case 'catclear': catDraft = []; renderCats(); break;
-    case 'catok': S.cats = [...catDraft]; S.q = ''; closeDlg(); if (S.route === 'descubrir') { renderNav(); VIEWS.descubrir(); } else go('feed'); break;
+    case 'catok': S.cats = [...catDraft]; S.q = ''; closeDlg(); if (VIEWS[S.route] && (S.route === 'descubrir' || S.route === 'marcas')) VIEWS[S.route](); else go('feed'); break;
+    case 'fclear': S.cats = []; S.maxPrice = null; VIEWS[S.route] && VIEWS[S.route](); break;
     case 'cat': S.cats = v === 'Todo' ? [] : (S.cats.includes(v) ? S.cats.filter(c => c !== v) : [...S.cats, v]); VIEWS[S.route] && VIEWS[S.route](); break;
     case 'gustos': S.draft = null; go('gustos'); break;
     case 'style': S.cats = []; S.q = ''; S.style = v; go('explorar'); break;
