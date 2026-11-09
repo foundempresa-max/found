@@ -269,7 +269,10 @@ function supabaseApi() {
   const withoutSizes = obj => { const o = { ...obj }; delete o.sizes; return o; };
   return {
     live: true,
-    onChange(cb) { sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') cb(); }); },
+    onChange(cb) { sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') { S.recovery = true; setTimeout(() => go('nueva-clave'), 0); } if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') cb(); }); },
+    // recuperar contraseña: Supabase envía un enlace que vuelve a la web con una sesión temporal
+    async resetPassword(email) { const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: SITE_URL }); fail(error); },
+    async updatePassword(password) { const { error } = await sb.auth.updateUser({ password }); fail(error); },
     async init() {
       const { data } = await sb.auth.getSession();
       const u = data?.session?.user; if (!u) return { user: null, profile: null };
@@ -505,6 +508,8 @@ function demoApi() {
       db.session = u.id; save();
     },
     async signOut() { db.session = null; save(); },
+    async resetPassword() { throw new Error('En el modo demo no se envían correos.'); },
+    async updatePassword() {},
     async saveProfile(uid, patch) { const u = db.users.find(x => x.id === uid); Object.assign(u, patch); save(); },
     async listProducts() {
       const u = me(), admin = u && u.role === 'admin';
@@ -872,7 +877,7 @@ function renderNav() {
     ['marcas', 'Marcas', ICON.compass, ['marcas', 'marca', 'vender']],
     ['descubrir', 'Feed', ICON.play, ['descubrir', 'explorar', 'gustos']],
     ['guardados', 'Favoritas', ICON.heart, ['guardados'], nfav],
-    [acct, 'Mi cuenta', ICON.user, ['cuenta', 'entrar', 'panel', 'mensajes', 'admin', 'pago'], (isBrand() || isAdmin()) ? nb : '']
+    [acct, 'Mi cuenta', ICON.user, ['cuenta', 'entrar', 'panel', 'mensajes', 'admin', 'pago', 'nueva-clave'], (isBrand() || isAdmin()) ? nb : '']
   ];
   const curT = t => t[3].includes(r) ? ' aria-current="page"' : '';
   const href = n => n === 'descubrir' ? '#/feed' : '#/' + n;
@@ -1360,6 +1365,7 @@ const resetTurnstile = () => { TS.token = ''; try { if (window.turnstile && TS.i
 
 VIEWS.entrar = () => {
   if (S.user) return go('cuenta');
+  if (S.authMode === 'forgot') return forgotView();
   const up = S.authMode === 'up', brand = S.authRole === 'brand';
   const sample = ranked(S.products).slice(0, 4);
   const side = brand && up
@@ -1377,6 +1383,7 @@ VIEWS.entrar = () => {
       ${up && brand ? '<label class="field"><span>Nombre de tu marca</span><input type="text" id="a-brand" maxlength="60" autocomplete="organization"></label>' : ''}
       <label class="field"><span>Correo</span><input type="email" id="a-email" autocomplete="email" required></label>
       <label class="field"><span>Contraseña${up ? ' (mínimo 8 caracteres)' : ''}</span><input type="password" id="a-pw" autocomplete="${up ? 'new-password' : 'current-password'}" required></label>
+      ${up ? '' : '<button type="button" class="linkbtn forgot" data-act="authmode" data-v="forgot">¿Has olvidado tu contraseña?</button>'}
       ${up ? `<label class="check terms"><input type="checkbox" id="a-terms" required> <span>He leído y acepto la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a> y el <a href="aviso-legal.html" target="_blank" rel="noopener">aviso legal</a>.</span></label>` : ''}
       ${honeypot()}
       ${turnstileOn() ? '<div class="ts-box" id="ts-box"></div>' : ''}
@@ -1432,12 +1439,67 @@ async function onAuthSubmit(e) {
     resetTurnstile();
   }
 }
+/* --- Recuperar contraseña --- */
+function forgotView() {
+  view.innerHTML = `<div class="wrap page has-tabbar"><div class="auth narrow-auth">
+    <h1 style="margin-bottom:10px;font-size:clamp(32px,4vw,44px)">Recupera tu contraseña</h1>
+    <p class="muted" style="margin:0 0 20px">Escribe el correo con el que te registraste y te enviaremos un enlace para poner una contraseña nueva.</p>
+    <form id="forgotForm" class="card-box" novalidate>
+      <label class="field"><span>Correo</span><input type="email" id="f-email" autocomplete="email" required value="${esc(S.forgotEmail || '')}"></label>
+      <p class="msg" id="fmsg" role="alert"></p>
+      <button class="btn block" type="submit" id="fsend">Enviarme el enlace</button>
+      <button type="button" class="linkbtn" data-act="authmode" data-v="in" style="margin-top:14px">← Volver a entrar</button>
+    </form></div></div>`;
+  $('#forgotForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const m = $('#fmsg'), btn = $('#fsend'), email = $('#f-email').value.trim(); m.className = 'msg';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { m.classList.add('err'); m.textContent = 'Escribe un correo válido, por ejemplo tu@correo.com.'; return; }
+    btn.disabled = true; btn.textContent = 'Enviando…'; S.forgotEmail = email;
+    try {
+      await api.resetPassword(email);
+      // mismo mensaje exista o no la cuenta, para no revelar qué correos están registrados
+      m.classList.add('ok'); m.textContent = 'Si hay una cuenta con ese correo, te llegará un enlace en unos minutos. Mira también en spam.';
+      btn.textContent = 'Enlace enviado';
+    } catch (err) { m.classList.add('err'); m.textContent = traduce(err.message); btn.disabled = false; btn.textContent = 'Enviarme el enlace'; }
+  });
+}
+VIEWS['nueva-clave'] = () => {
+  if (!S.user) {
+    view.innerHTML = `<div class="wrap page has-tabbar"><div class="auth narrow-auth"><h1 style="font-size:clamp(32px,4vw,44px)">El enlace ha caducado</h1>
+      <p class="muted">Los enlaces para cambiar la contraseña solo valen una vez y durante un tiempo. Pide otro.</p>
+      <button class="btn" data-act="authmode" data-v="forgot">Pedir un enlace nuevo</button></div></div>`;
+    return;
+  }
+  view.innerHTML = `<div class="wrap page has-tabbar"><div class="auth narrow-auth">
+    <h1 style="margin-bottom:10px;font-size:clamp(32px,4vw,44px)">${S.recovery ? 'Pon tu contraseña nueva' : 'Cambiar contraseña'}</h1>
+    <p class="muted" style="margin:0 0 20px">Cuenta: <b>${esc(S.user.email)}</b></p>
+    <form id="pwForm" class="card-box" novalidate>
+      <label class="field"><span>Contraseña nueva (mínimo 8 caracteres)</span><input type="password" id="n-pw" autocomplete="new-password" required></label>
+      <label class="field"><span>Repítela</span><input type="password" id="n-pw2" autocomplete="new-password" required></label>
+      <p class="msg" id="nmsg" role="alert"></p>
+      <button class="btn block" type="submit" id="nsend">Guardar contraseña</button>
+    </form></div></div>`;
+  $('#pwForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const m = $('#nmsg'), btn = $('#nsend'), a = $('#n-pw').value, b = $('#n-pw2').value; m.className = 'msg';
+    if (a.length < 8) { m.classList.add('err'); m.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+    if (a !== b) { m.classList.add('err'); m.textContent = 'Las dos contraseñas no coinciden.'; return; }
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    try {
+      await api.updatePassword(a);
+      S.recovery = false; toast('Contraseña cambiada');
+      go(isBrand() ? 'panel' : 'cuenta');
+    } catch (err) { m.classList.add('err'); m.textContent = traduce(err.message); btn.disabled = false; btn.textContent = 'Guardar contraseña'; }
+  });
+};
 function traduce(msg) {
   const t = String(msg || '');
   if (/invalid login/i.test(t)) return 'Correo o contraseña incorrectos.';
   if (/already registered|already been registered/i.test(t)) return 'Ya existe una cuenta con ese correo. Pulsa «Entrar» y usa tu contraseña.';
   if (/email not confirmed/i.test(t)) return 'Aún no has confirmado tu correo. Revisa tu bandeja de entrada.';
-  if (/rate limit/i.test(t)) return 'Demasiados intentos. Espera un momento y vuelve a probar.';
+  if (/rate limit|only request this after/i.test(t)) return 'Demasiados intentos. Espera un minuto y vuelve a probar.';
+  if (/same.*(as|than).*old password|different from the old/i.test(t)) return 'La contraseña nueva tiene que ser distinta de la anterior.';
+  if (/password should be at least|weak password/i.test(t)) return 'Esa contraseña es demasiado débil. Usa al menos 8 caracteres, mezclando letras y números.';
   if (/captcha/i.test(t)) return 'No se pudo completar la comprobación de seguridad. Recarga la página y vuelve a probar.';
   if (/FOUND_EMAIL_BLOQUEADO|Database error saving new user/i.test(t)) return 'No se puede crear una cuenta con este correo. Si crees que es un error, escríbenos.';
   return t;
@@ -1455,7 +1517,7 @@ VIEWS.cuenta = () => {
       <div><dt>Correo</dt><dd>${esc(S.user.email)}</dd></div>
       <div><dt>Tipo de cuenta</dt><dd>${isAdmin() ? 'Creador (administrador)' : isBrand() ? 'Marca · ' + esc(S.profile.brand_name || '') : 'Comprador'}</dd></div>
       <div><dt>Tus gustos</dt><dd>${hasTaste() ? `<div class="chips">${S.taste.styles.map(s => `<span class="tag">${esc(s)}</span>`).join('')}${S.taste.cats.map(s => `<span class="tag">${esc(s)}</span>`).join('')}<span class="tag">hasta ${S.taste.budget} ${esc(C.currency)}</span></div>` : '<span class="muted">Aún no has hecho el test de estilo.</span>'}</dd></div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn ghost small" href="#/gustos">${hasTaste() ? 'Editar mis gustos' : 'Hacer el test'}</a><a class="btn ghost small" href="#/guardados">Mis guardados</a>${isBrand() ? '<a class="btn small" href="#/panel">Ir a mi panel</a>' : ''}${isAdmin() ? '<a class="btn small" href="#/admin">Panel de creador</a>' : ''}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn ghost small" href="#/gustos">${hasTaste() ? 'Editar mis gustos' : 'Hacer el test'}</a><a class="btn ghost small" href="#/nueva-clave">Cambiar contraseña</a><a class="btn ghost small" href="#/guardados">Mis guardados</a>${isBrand() ? '<a class="btn small" href="#/panel">Ir a mi panel</a>' : ''}${isAdmin() ? '<a class="btn small" href="#/admin">Panel de creador</a>' : ''}</div>
     </dl></div></div>
     ${api.live ? '' : '<p class="muted" style="margin-top:14px;font-size:14px">Estás en modo demo: los datos viven solo en este navegador. Conecta Supabase (mira el README) para tener usuarios y productos reales.</p><p style="margin-top:10px"><button class="btn ghost small" data-act="resetdemo">Restablecer datos de demo</button> ' + (isAdmin() ? '' : '<button class="btn small" data-act="makeadmin">Activar modo creador (demo)</button>') + '</p>'}
   </div>`;
@@ -2184,7 +2246,7 @@ function renderPanel() {
   const ed = S.editing ? mine.find(p => p.id === S.editing) : null;
   const d = S.draft && S.draft.form ? S.draft.form : (ed ? { name: ed.name, price: ed.price, cat: ed.cat, color: ed.color, desc: ed.desc, buy_url: ed.buy_url } : { name: '', price: '', cat: C.categories[0], color: '#E6335F', desc: '', buy_url: '' });
   const act = isActiveBrand();
-  view.innerHTML = `<div class="wrap page has-tabbar"><div class="pagehead"><div><span class="eyebrow">Panel de marca</span><h1 style="margin-top:12px">${esc(S.profile.brand_name || 'Tu marca')}</h1><p class="muted">Sube productos y mira cómo responden los compradores.${modOn() && !S.modMissing ? ' Cada prenda nueva la revisamos antes de mostrarla.' : ''}</p></div>
+  view.innerHTML = `<div class="wrap page has-tabbar"><div class="pagehead"><div><span class="eyebrow">Panel de marca</span><h1 style="margin-top:12px">${esc(S.profile.brand_name || 'Tu marca')}</h1><p class="muted">Sube productos y mira cómo responden los compradores.${modOn() && !S.modMissing ? ' Cada prenda nueva la revisamos antes de mostrarla.' : ''}</p><p class="acctlinks"><a href="#/mensajes">Mensajes</a> · <a href="#/nueva-clave">Cambiar contraseña</a> · <button type="button" class="linkbtn" data-act="logout">Cerrar sesión</button></p></div>
       <div class="ph-acts"><a class="btn ghost small" href="#/mensajes">Mensajes <span class="tabn" data-unread${S.unread ? '' : ' hidden'}>${S.unread}</span></a><a class="btn ghost small" href="#/marca/${esc(S.user.id)}">Ver mi página pública</a></div></div>
     <div id="panel-msgs">${panelMsgsHTML()}</div>
     ${act && billingOn() ? subStatusBox() : ''}
@@ -2603,7 +2665,7 @@ document.addEventListener('click', async e => {
       lsSet('found_taste', S.taste); S.draft = null; S.onlyMine = true; logSite('test');
       if (S.user) { try { await api.saveProfile(S.user.id, { styles: S.taste.styles, cats: S.taste.cats, budget: S.taste.budget, sizes: S.taste.sizes });S.profile = { ...S.profile, ...S.taste }; } catch (err) { toast('Tus gustos se guardaron en este dispositivo, pero no en tu cuenta: ' + err.message); } }
       toast('Gustos guardados'); go('feed'); break; }
-    case 'authmode': S.authMode = v; VIEWS.entrar(); break;
+    case 'authmode': S.authMode = v; if (S.route !== 'entrar') go('entrar'); else VIEWS.entrar(); break;
     case 'authrole': S.authRole = v; VIEWS.entrar(); break;
     case 'logout': stopChatWatch(); S.chat = { brand: null, product: null, draft: '', thread: [] }; S.billing = null; S.editMode = false; S.textDraft = {}; S.colorDraft = null; await api.signOut(); S.user = null; S.profile = null; S.favs = guestFavs(); S.editing = null; renderNav(); toast('Has cerrado sesión'); go('inicio'); break;
     case 'resetdemo': try { localStorage.removeItem('found_demo_v1'); localStorage.removeItem('found_guest_favs'); localStorage.removeItem('found_taste'); } catch {} location.hash = '#/descubrir'; location.reload(); break;
@@ -2876,6 +2938,7 @@ function route() {
   const h = /^#\//.test(location.hash) ? location.hash.slice(2) : '';
   let [name, arg] = (h || 'marcas').split('/');
   name = { inicio: 'marcas', feed: 'descubrir', favoritas: 'guardados' }[name] || name;
+  if (name !== 'entrar' && S.authMode === 'forgot') S.authMode = 'in';
   S.route = VIEWS[name] && name !== '404' ? name : (h ? '404' : 'marcas');
   document.body.classList.remove('noscroll');
   if (S.route !== 'explorar') { S.q = ''; S.style = 'Todos'; }
@@ -2912,6 +2975,10 @@ document.addEventListener('submit', e => {
 });
 
 (async function start() {
+  // enlace de «recuperar contraseña»: Supabase vuelve con #access_token=…&type=recovery, o con un error si ha caducado
+  const authHash = location.hash;
+  if (/type=recovery/.test(authHash)) S.recovery = true;
+  if (/error_code=otp_expired|error=access_denied/.test(authHash)) { S.linkExpired = true; history.replaceState(null, '', location.pathname + '#/nueva-clave'); }
   if (/[?&]pago=/.test(location.search)) history.replaceState(null, '', location.pathname + '#/pago');
   // enlaces compartidos: ?p=ID abre la prenda, ?m=ID abre la página de la marca
   const qs = new URLSearchParams(location.search), sharedP = qs.get('p'), sharedM = qs.get('m'), sharedQ = qs.get('q');
@@ -2922,6 +2989,7 @@ document.addEventListener('submit', e => {
   try { applySettings(await api.getSettings()); } catch { applySettings(null); }
   await refreshProducts();
   api.onChange(async () => { if (!S.user) { await afterAuth(); await refreshProducts(); route(); } });
+  if (S.recovery && S.user && !/^#\/nueva-clave/.test(location.hash)) history.replaceState(null, '', location.pathname + '#/nueva-clave');
   route();
   if (sharedP) { if (S.products.some(p => p.id === sharedP)) openProduct(sharedP); else toast('Esta prenda ya no está disponible. Mira otras parecidas.'); }
 })();
