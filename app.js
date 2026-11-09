@@ -1376,7 +1376,7 @@ VIEWS.entrar = () => {
       ${up ? `<div class="seg" role="group" aria-label="Tipo de cuenta"><button type="button" data-act="authrole" data-v="buyer" aria-pressed="${!brand}">Soy comprador</button><button type="button" data-act="authrole" data-v="brand" aria-pressed="${brand}">Soy una marca</button></div>` : ''}
       ${up && brand ? '<label class="field"><span>Nombre de tu marca</span><input type="text" id="a-brand" maxlength="60" autocomplete="organization"></label>' : ''}
       <label class="field"><span>Correo</span><input type="email" id="a-email" autocomplete="email" required></label>
-      <label class="field"><span>Contraseña${up ? ' (mínimo 6 caracteres)' : ''}</span><input type="password" id="a-pw" autocomplete="${up ? 'new-password' : 'current-password'}" required></label>
+      <label class="field"><span>Contraseña${up ? ' (mínimo 8 caracteres)' : ''}</span><input type="password" id="a-pw" autocomplete="${up ? 'new-password' : 'current-password'}" required></label>
       ${up ? `<label class="check terms"><input type="checkbox" id="a-terms" required> <span>He leído y acepto la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a> y el <a href="aviso-legal.html" target="_blank" rel="noopener">aviso legal</a>.</span></label>` : ''}
       ${honeypot()}
       ${turnstileOn() ? '<div class="ts-box" id="ts-box"></div>' : ''}
@@ -1396,7 +1396,8 @@ async function onAuthSubmit(e) {
   const email = $('#a-email').value.trim(), pw = $('#a-pw').value, up = S.authMode === 'up', brand = S.authRole === 'brand';
   const brandName = up && brand ? $('#a-brand').value.trim() : '';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { m.classList.add('err'); m.textContent = 'Escribe un correo válido, por ejemplo tu@correo.com.'; return; }
-  if (pw.length < 6 && (up || api.live)) { m.classList.add('err'); m.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+  if (up && pw.length < 8) { m.classList.add('err'); m.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+  if (pw.length < 6 && api.live) { m.classList.add('err'); m.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
   if (up && brand && !brandName) { m.classList.add('err'); m.textContent = 'Escribe el nombre de tu marca.'; return; }
   if (up && !$('#a-terms').checked) { m.classList.add('err'); m.textContent = 'Para crear la cuenta tienes que aceptar la política de privacidad.'; return; }
   const bot = looksLikeBot(e.target, up ? 2500 : 1200);
