@@ -895,22 +895,24 @@ function renderNav() {
 /* ---------- cuadrado de categorías: se toca y se eligen una o varias prendas ---------- */
 const catLabel = () => !S.cats.length ? 'Todas las prendas' : S.cats.length <= 2 ? S.cats.join(' y ') : S.cats.length + ' tipos de prenda';
 // v24.2 · barra de filtros: «Prendas» (desplegable) y «Precio máximo» (barra deslizante)
-const priceTop = () => Math.max(50, Math.ceil(Math.max(0, ...S.products.map(p => Number(p.price) || 0)) / 50) * 50);
+// la barra va de 0 a 100 €; arriba del todo significa «sin límite» (100 € o más)
+const priceTop = () => 100;
+const priceTxt = v => v >= priceTop() ? money(priceTop()) + '+' : money(v);
 const priceOk = p => S.maxPrice == null || Number(p.price) <= S.maxPrice;
 function filterBar(where) {
   const top = priceTop(), v = S.maxPrice == null ? top : Math.min(S.maxPrice, top);
   return `<div class="fbar" role="group" aria-label="Filtros">
     <button type="button" class="fsel${S.cats.length ? ' on' : ''}" data-act="cats" data-v="${where}" aria-haspopup="dialog" aria-label="Prendas: ${esc(catLabel())}"><span><small>Prendas</small>${esc(!S.cats.length ? 'Todas' : S.cats.length === 1 ? S.cats[0] : S.cats.length + ' tipos')}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="fprice"><div class="fp-top"><label for="fprice">Precio máximo</label><b id="fprice-v">${money(v)}</b></div>
-      <input type="range" id="fprice" min="0" max="${top}" step="5" value="${v}" aria-valuetext="${money(v)}">
-      <div class="fp-ends" aria-hidden="true"><span>${money(0)}</span><span>${money(top)}</span></div></div>
+    <div class="fprice"><div class="fp-top"><label for="fprice">Precio máximo</label><b id="fprice-v">${priceTxt(v)}</b></div>
+      <input type="range" id="fprice" min="0" max="${top}" step="5" value="${v}" aria-valuetext="${v >= top ? 'Sin límite' : money(v)}">
+      <div class="fp-ends" aria-hidden="true"><span>${money(0)}</span><span>${money(top)}+</span></div></div>
   </div>`;
 }
 // la barra de precio: el número cambia mientras arrastras y la lista se actualiza al soltar
 document.addEventListener('input', e => {
   if (e.target.id !== 'fprice') return;
   const v = Number(e.target.value), o = $('#fprice-v');
-  if (o) o.textContent = money(v); e.target.setAttribute('aria-valuetext', money(v));
+  if (o) o.textContent = priceTxt(v); e.target.setAttribute('aria-valuetext', v >= priceTop() ? 'Sin límite' : money(v));
 });
 document.addEventListener('change', e => {
   if (e.target.id !== 'fprice') return;
