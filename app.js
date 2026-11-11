@@ -162,6 +162,16 @@ function art(p, full) {
 }
 const pic = (p, alt) => p.image ? `<img src="${esc(p.image)}" alt="${esc(alt === undefined ? `${p.name} de ${p.brand}` : alt)}" loading="lazy" decoding="async">` : art(p);
 const ICON = {
+  globe:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>',
+  ig:'<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.2 6.8v.1"/></svg>',
+  mail:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7l8 6 8-6"/></svg>',
+  truck:'<svg viewBox="0 0 24 24"><path d="M2.5 6.5h11v9h-11zM13.5 9.5h4l3 3v3h-7z"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg>',
+  clock:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  ret:'<svg viewBox="0 0 24 24"><path d="M4 9h11a5 5 0 010 10H9"/><path d="M8 5L4 9l4 4"/></svg>',
+  out:'<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg>',
+  wa:'<svg viewBox="0 0 24 24"><path d="M4.5 19.5l1.2-3.6A8 8 0 1112 20a8 8 0 01-3.9-1z"/><path d="M9.2 8.6c.2-.4.6-.4.8-.1l.8 1.6c.1.2 0 .5-.2.7l-.5.5c.5 1 1.3 1.9 2.4 2.4l.5-.5c.2-.2.5-.3.7-.2l1.6.8c.3.2.3.6-.1.8-.6.5-1.4.7-2.1.4a7.3 7.3 0 01-4.3-4.3c-.3-.7-.1-1.6.4-2.1z" fill="currentColor" stroke="none"/></svg>',
+  link:'<svg viewBox="0 0 24 24"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg>',
+  check:'<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   play:'<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M10 8.5v7l5.5-3.5z"/></svg>',
   heart:'<svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 5 6.4 5c2 0 3.6 1.1 4.6 2.7h2C14 6.1 15.6 5 17.6 5 21 5 23.1 8.4 21.6 11.8 19.5 16.4 12 21 12 21z"/></svg>',
   info:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>',
@@ -180,6 +190,50 @@ const ICON = {
   share:'<svg viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 12v7a1 1 0 001 1h12a1 1 0 001-1v-7"/></svg>'
 };
 
+/* ---------- perfil público de marca (v25) ---------- */
+// sellos que una marca puede mostrar (se eligen en su panel)
+const BADGES = ['Hecho en España', 'Sostenible', 'Hecho a mano', 'Tiradas cortas', 'Segunda vida'];
+const DEMO_FOLLOWERS = { b1: 214, b2: 156, b3: 389, b4: 97, b5: 172, b6: 63 };
+// envío, entrega y devoluciones: { ship (€, 0 = gratis), freeFrom (€), dMin, dMax (días laborables), ret (días, 0 = no acepta), retFree }
+function normShop(o) {
+  o = o && typeof o === 'object' && !Array.isArray(o) ? o : {};
+  const num = (v, max) => { const n = Number(v); return v === '' || v == null || !isFinite(n) || n < 0 ? null : Math.min(n, max); };
+  const out = { ship: num(o.ship, 999), freeFrom: num(o.freeFrom, 9999), dMin: num(o.dMin, 90), dMax: num(o.dMax, 90), ret: num(o.ret, 365), retFree: o.retFree === true };
+  if (out.dMin != null) out.dMin = Math.round(out.dMin); if (out.dMax != null) out.dMax = Math.round(out.dMax); if (out.ret != null) out.ret = Math.round(out.ret);
+  if (out.dMin != null && out.dMax != null && out.dMax < out.dMin) [out.dMin, out.dMax] = [out.dMax, out.dMin];
+  if (out.ship === 0) out.freeFrom = null;
+  return out;
+}
+const shopHas = sh => sh && (sh.ship != null || sh.dMin != null || sh.dMax != null || sh.ret != null);
+// líneas que ve el comprador: envío, entrega y devoluciones
+function shopLines(sh) {
+  if (!shopHas(sh)) return [];
+  const L = [];
+  if (sh.ship === 0) L.push(['ship', 'Envío gratis']);
+  else if (sh.ship != null) L.push(['ship', 'Envío ' + money(sh.ship) + (sh.freeFrom ? ' · gratis desde ' + money(sh.freeFrom) : '')]);
+  const a = sh.dMin, b = sh.dMax;
+  if (a != null || b != null) { const x = a ?? b, y = b ?? a; L.push(['time', 'Entrega en ' + (x === y ? x : x + '–' + y) + (y === 1 ? ' día laborable' : ' días laborables')]); }
+  if (sh.ret === 0) L.push(['ret', 'No acepta devoluciones']);
+  else if (sh.ret != null) L.push(['ret', 'Devoluciones en ' + sh.ret + ' días' + (sh.retFree ? ', gratis' : '')]);
+  return L;
+}
+const igHandle = v => String(v || '').trim().replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/[/?#].*$/, '');
+const igOk = h => /^[A-Za-z0-9._]{1,30}$/.test(h);
+const webLabel = u => String(u || '').replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '');
+// estilo de la marca: las etiquetas que más usan sus prendas (máximo dos)
+function brandStyles(items) {
+  const m = {}; items.forEach(p => p.tags.forEach(t => { m[t] = (m[t] || 0) + 1; }));
+  return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
+}
+// rango de precios: «30–120 €» (sin céntimos, que en una línea corta sobran)
+function priceRange(items) {
+  if (!items.length) return '';
+  const ps = items.map(p => Number(p.price) || 0), lo = Math.floor(Math.min(...ps)), hi = Math.ceil(Math.max(...ps));
+  return lo === hi ? money(lo) : NF_INT.format(lo) + '–' + NF_INT.format(hi) + '\u00a0' + C.currency;
+}
+const brandLine = b => [brandStyles(b.items).join(' y '), b.city, priceRange(b.items)].filter(Boolean);
+const badgesHTML = (list, cls = '') => list && list.length ? `<span class="badges${cls ? ' ' + cls : ''}">${list.map(x => `<span class="badge">${esc(x)}</span>`).join('')}</span>` : '';
+
 /* ---------- normalizar productos ---------- */
 const MAX_PHOTOS = 5;
 function norm(r) {
@@ -191,7 +245,10 @@ function norm(r) {
     images: (Array.isArray(r.images) && r.images.length ? r.images : r.image ? [r.image] : []).filter(u => typeof u === 'string' && u).slice(0, MAX_PHOTOS),
     buy_url: r.buy_url || '', created: r.created || '', featured: !!r.featured,
     sizes: Array.isArray(r.sizes) ? r.sizes : [],
-    status: r.status || 'approved', reason: r.reason || ''
+    status: r.status || 'approved', reason: r.reason || '',
+    // v25 · perfil público de la marca (se repite en cada prenda para no hacer otra consulta)
+    city: r.city || '', story: r.story || '', ig: r.ig || '', web: isUrl(r.web) ? r.web : '',
+    badges: Array.isArray(r.badges) ? r.badges.filter(b => BADGES.includes(b)) : [], shop: normShop(r.shop)
   };
   o.image = o.images[0] || '';
   return o;
@@ -259,6 +316,7 @@ function supabaseApi() {
   const rowToProduct = r => norm({
     id: r.id, brand_id: r.brand_id, brand: r.profiles?.brand_name, contact: r.profiles?.contact_email, bio: r.profiles?.brand_bio,
     logo: r.profiles?.logo_url, cover: r.profiles?.cover_url,
+    city: r.profiles?.brand_city, story: r.profiles?.brand_story, ig: r.profiles?.instagram, web: r.profiles?.website, badges: r.profiles?.brand_badges, shop: r.profiles?.shop_info,
     name: r.name, price: r.price, cat: r.category, tags: r.tags, color: r.color, desc: r.description,
     image: r.image_url, images: r.images, buy_url: r.buy_url, created: r.created_at, featured: r.featured, sizes: r.sizes, status: r.status, reason: r.reject_reason
   });
@@ -290,10 +348,15 @@ function supabaseApi() {
     async saveProfile(uid, patch) {
       let { error } = await sb.from('profiles').update(patch).eq('id', uid);
       if (noSizesCol(error, patch)) ({ error } = await sb.from('profiles').update(withoutSizes(patch)).eq('id', uid));
+      if (error && /brand_city|brand_story|instagram|website|brand_badges|shop_info/.test(error.message || '')) throw new Error('Falta activar el perfil completo de marca: ejecuta supabase/marcas-v25.sql en Supabase.');
+      if (error && /profiles_instagram_ok/.test(error.message || '')) throw new Error('El usuario de Instagram no es válido.');
+      if (error && /profiles_website_ok/.test(error.message || '')) throw new Error('La dirección de la web debe empezar por https://');
       fail(error);
     },
     async listProducts() {
-      let { data, error } = await sb.from('products').select('*, profiles:brand_id(brand_name, contact_email, brand_bio, logo_url, cover_url)').order('created_at', { ascending: false });
+      let { data, error } = await sb.from('products').select('*, profiles:brand_id(brand_name, contact_email, brand_bio, logo_url, cover_url, brand_city, brand_story, instagram, website, brand_badges, shop_info)').order('created_at', { ascending: false });
+      // si aún no se ha ejecutado marcas-v25.sql, se cargan sin el perfil completo
+      if (error && /brand_city|brand_story|instagram|website|brand_badges|shop_info/.test(error.message || '')) ({ data, error } = await sb.from('products').select('*, profiles:brand_id(brand_name, contact_email, brand_bio, logo_url, cover_url)').order('created_at', { ascending: false }));
       // si aún no se ha ejecutado marcas.sql, se cargan sin logo ni portada
       if (error && /logo_url|cover_url/.test(error.message || '')) ({ data, error } = await sb.from('products').select('*, profiles:brand_id(brand_name, contact_email, brand_bio)').order('created_at', { ascending: false }));
       fail(error); S.modMissing = !!(data && data.length && !('status' in data[0])); return (data || []).map(rowToProduct);
@@ -319,9 +382,18 @@ function supabaseApi() {
         else break;
         ({ error } = await write(r));
       }
+      if (error && /FOUND_FALTA_LOGO_PORTADA/.test(error.message || '')) throw new Error('Antes de publicar, sube el logo y la foto de portada de tu marca en «Perfil de marca».');
       fail(error); return out;
     },
     async removeProduct(id) { const { error } = await sb.from('products').delete().eq('id', id); fail(error); },
+    // --- seguir marcas (v25) ---
+    async listFollows(uid) { const { data, error } = await sb.from('brand_follows').select('brand_id').eq('user_id', uid); if (error) return []; return (data || []).map(r => r.brand_id); },
+    async setFollow(uid, brandId, on) {
+      const { error } = on ? await sb.from('brand_follows').upsert({ user_id: uid, brand_id: brandId }, { onConflict: 'user_id,brand_id', ignoreDuplicates: true }) : await sb.from('brand_follows').delete().eq('user_id', uid).eq('brand_id', brandId);
+      if (error && /brand_follows|schema cache|Could not find/i.test(error.message || '')) throw new Error('Seguir marcas aún no está activado (falta ejecutar supabase/marcas-v25.sql).');
+      fail(error);
+    },
+    async followerCounts() { const { data, error } = await sb.rpc('brand_follower_counts'); if (error) return {}; const m = {}; (data || []).forEach(r => { m[r.brand_id] = Number(r.n) || 0; }); return m; },
     async uploadBrandImage(uid, file, kind) {
       const o = BRAND_IMG[kind];
       const blob = await shrink(file, o.max, 0.86, o.type);
@@ -512,11 +584,17 @@ function demoApi() {
   let db = lsGet(KEY, null);
   function save() { if (!lsSet(KEY, db)) throw new Error('No hay espacio en el navegador para guardar más datos de demo.'); }
   if (!db) { db = seed(); lsSet(KEY, db); }
+  // v25 · las marcas de ejemplo guardadas antes de esta versión reciben su perfil completo
+  if (db.users.some(u => /^b\d$/.test(u.id) && u.brand_city === undefined)) {
+    const fresh = seed();
+    fresh.users.forEach(f => { const u = db.users.find(x => x.id === f.id); if (u && u.brand_city === undefined) ['brand_city', 'brand_badges', 'shop_info', 'brand_story', 'instagram', 'website'].forEach(k => { u[k] = f[k]; }); });
+    lsSet(KEY, db);
+  }
   if (!db.billing) { db.billing = {}; db.users.filter(u => u.role === 'brand' && /^b\d$/.test(u.id)).forEach(u => { db.billing[u.id] = { brand_id: u.id, status: 'none', manual: true }; }); lsSet(KEY, db); }
   const activeB = id => { const b = db.billing[id]; return !!b && (b.manual || ['active', 'trialing', 'past_due'].includes(b.status)); };
   const me = () => db.users.find(u => u.id === db.session) || null;
   const userObj = u => u && { id: u.id, email: u.email };
-  const withBrand = p => { const b = db.users.find(u => u.id === p.brand_id) || {}; return norm({ ...p, brand: b.brand_name, contact: b.contact_email, bio: b.brand_bio, logo: b.logo_url, cover: b.cover_url }); };
+  const withBrand = p => { const b = db.users.find(u => u.id === p.brand_id) || {}; return norm({ ...p, brand: b.brand_name, contact: b.contact_email, bio: b.brand_bio, logo: b.logo_url, cover: b.cover_url, city: b.brand_city, story: b.brand_story, ig: b.instagram, web: b.website, badges: b.brand_badges, shop: b.shop_info }); };
   return {
     live: false,
     onChange() {},
@@ -552,10 +630,17 @@ function demoApi() {
         const old = db.products.find(p => p.id === id), st = old.status || 'approved';
         if (u && u.role !== 'admin' && (st === 'rejected' || (st === 'approved' && modOn && (JSON.stringify(row.images) !== JSON.stringify(old.images || (old.image ? [old.image] : [])) || row.name !== old.name)))) { row.status = modOn ? 'pending' : 'approved'; row.reason = ''; }
         Object.assign(old, row);
-      } else db.products.push({ id: 'd' + Date.now(), brand_id: uid, created: new Date().toISOString(), status: (u && u.role === 'admin') || !modOn ? 'approved' : 'pending', ...row });
+      } else {
+        const bu = db.users.find(x => x.id === uid);
+        if (u && u.role !== 'admin' && bu && (!bu.logo_url || !bu.cover_url)) throw new Error('Antes de publicar, sube el logo y la foto de portada de tu marca en «Perfil de marca».');
+        db.products.push({ id: 'd' + Date.now(), brand_id: uid, created: new Date().toISOString(), status: (u && u.role === 'admin') || !modOn ? 'approved' : 'pending', ...row });
+      }
       save();
     },
     async adminSaveCounts() { const m = {}; Object.values(db.favs).forEach(l => l.forEach(id => { m[id] = (m[id] || 0) + 1; })); return m; },
+    async listFollows(uid) { return ((db.follows || {})[uid] || []).slice(); },
+    async setFollow(uid, brandId, on) { db.follows = db.follows || {}; const l = new Set(db.follows[uid] || []); on ? l.add(brandId) : l.delete(brandId); db.follows[uid] = [...l]; save(); },
+    async followerCounts() { const m = {}; Object.values(db.follows || {}).forEach(l => l.forEach(id => { m[id] = (m[id] || 0) + 1; })); Object.entries(DEMO_FOLLOWERS).forEach(([k, n]) => { m[k] = (m[k] || 0) + n; }); return m; },
     async adminUpdateProduct(id, f) { Object.assign(db.products.find(p => p.id === id), { name: f.name, price: f.price, cat: f.cat, tags: f.tags, sizes: f.sizes, desc: f.desc, buy_url: f.buy_url }); save(); },
     async adminBlocked() { return { list: (db.blocked || []).slice().reverse() }; },
     async adminBlock(email, reason) { db.blocked = (db.blocked || []).filter(x => x.email !== email.toLowerCase().trim()); db.blocked.push({ email: email.toLowerCase().trim(), reason: reason || '', created_at: new Date().toISOString() }); save(); },
@@ -652,7 +737,16 @@ function demoApi() {
       ['b5', 'Raíz Textil', 'Tejidos naturales, tintes vegetales y trabajo artesano.'],
       ['b6', 'Ola Sport', 'Ropa deportiva técnica con materiales reciclados.']
     ];
-    const users = B.map(([id, n, bio]) => ({ id, email: id + '@demo.found', role: 'brand', brand_name: n, brand_bio: bio, contact_email: 'hola@' + n.toLowerCase().replace(/[^a-z0-9]/g, '') + '.demo', styles: [], cats: [], budget: 150 }));
+    const META = {
+      b1: ['Bilbao', ['Hecho en España', 'Sostenible'], { ship: 4.9, freeFrom: 80, dMin: 2, dMax: 4, ret: 30, retFree: true }, 'Empezamos en 2019 en un taller de Bilbao con una idea sencilla: hacer pocas prendas, muy bien hechas, con lino y lana que duren años.'],
+      b2: ['Valencia', ['Hecho en España', 'Tiradas cortas'], { ship: 5.5, freeFrom: 120, dMin: 3, dMax: 5, ret: 14, retFree: false }, 'Marea nace del mar Mediterráneo y de la costura de nuestra abuela. Patronamos y cosemos cada vestido en Valencia.'],
+      b3: ['Madrid', ['Tiradas cortas'], { ship: 3.9, freeFrom: 60, dMin: 1, dMax: 3, ret: 14, retFree: false }, 'Calle 33 empezó como un proyecto de serigrafía entre amigos. Cada colección sale en ediciones de 200 unidades.'],
+      b4: ['Sevilla', ['Segunda vida', 'Hecho a mano'], { ship: 4.5, dMin: 2, dMax: 5, ret: 0 }, 'Rescatamos prendas de archivo y las rehacemos a mano. Cada pieza es única.'],
+      b5: ['Oaxaca · Granada', ['Hecho a mano', 'Sostenible'], { ship: 0, dMin: 4, dMax: 7, ret: 30, retFree: true }, 'Trabajamos con artesanas que tiñen con plantas y tejen a mano. Pagamos precios justos y lo contamos todo.'],
+      b6: ['Barcelona', ['Sostenible'], { ship: 3.5, freeFrom: 50, dMin: 1, dMax: 2, ret: 30, retFree: true }, 'Ropa deportiva técnica hecha con poliéster reciclado de botellas.']
+    };
+    const users = B.map(([id, n, bio]) => ({ id, email: id + '@demo.found', role: 'brand', brand_name: n, brand_bio: bio, contact_email: 'hola@' + n.toLowerCase().replace(/[^a-z0-9]/g, '') + '.demo', styles: [], cats: [], budget: 150,
+      brand_city: META[id][0], brand_badges: META[id][1], shop_info: META[id][2], brand_story: META[id][3], instagram: n.toLowerCase().replace(/[^a-z0-9]/g, ''), website: 'https://' + n.toLowerCase().replace(/[^a-z0-9]/g, '') + '.example' }));
     const P = [
       ['b1','Camiseta lino bruma',38,'Camisetas',['Minimalista','Sostenible'],'#C9C4B0','Lino lavado de cultivo europeo. Corte recto y cuello limpio, pensada para durar años.'],
       ['b2','Vestido midi Marea',96,'Vestidos',['Elegante','Minimalista'],'#2F3E8F','Caída fluida, cintura marcada y espalda abierta. Se pasa del día a la noche.'],
@@ -683,10 +777,10 @@ const configured = !!(C.supabaseUrl && C.supabaseAnonKey);
 const hasLib = !!window.supabase;
 const api = configured && hasLib ? supabaseApi() : demoApi();
 const S = {
-  user: null, profile: null, products: [], allProducts: [], favs: new Set(), counts: {},
+  user: null, profile: null, products: [], allProducts: [], favs: new Set(), counts: {}, follows: new Set(), fcounts: {}, sizeF: [], feedTestSeen: false,
   taste: lsGet('found_taste', null),
   cats: [], maxPrice: null, style: 'Todos', q: '', sort: 'match', authMode: 'in', authRole: 'buyer',
-  formTags: [], formSizes: [], formPhotos: [], onlyMine: true, editing: null, draft: null, settings: null, adminTab: 'resumen', siteDays: 30, rankDays: 30,
+  formTags: [], formSizes: [], formPhotos: [], onlyMine: false, editing: null, draft: null, settings: null, adminTab: 'resumen', siteDays: 30, rankDays: 30,
   billing: null, ev: {}, statsDays: 30, editMode: false, textDraft: {}, colorDraft: null, colorsOpen: false, resetTexts: false,
   unread: 0, chat: { brand: null, product: null, draft: '', thread: [] }
 };
@@ -878,11 +972,13 @@ const view = $('#view');
 async function refreshProducts() {
   try { S.allProducts = await api.listProducts(); } catch (e) { S.allProducts = []; toast('No se pudieron cargar los productos: ' + e.message); }
   S.products = S.allProducts.filter(p => p.status === 'approved');
+  try { S.fcounts = await api.followerCounts(); } catch { S.fcounts = {}; }
 }
 const findProduct = id => S.allProducts.find(x => x.id === id);
 const modOn = () => !(S.settings && S.settings.moderation === false);
 const approvalOn = () => !(S.settings && S.settings.brandApproval === false); // «Solo marcas aprobadas» (v24.7)
 const guestFavs = () => new Set(lsGet('found_guest_favs', []));
+const guestFollows = () => new Set(lsGet('found_guest_follows', []));
 async function afterAuth() {
   const { user, profile } = await api.init();
   S.user = user; S.profile = profile;
@@ -895,8 +991,13 @@ async function afterAuth() {
     for (const id of g) { try { await api.setFav(user.id, id, true); } catch {} }
     if (g.size) lsSet('found_guest_favs', []);
     try { S.favs = new Set(await api.listFavs(user.id)); } catch { S.favs = new Set(); }
+    // marcas seguidas como invitado -> cuenta
+    const gf = guestFollows();
+    for (const id of gf) { try { await api.setFollow(user.id, id, true); } catch {} }
+    if (gf.size) lsSet('found_guest_follows', []);
+    try { S.follows = new Set(await api.listFollows(user.id)); } catch { S.follows = new Set(); }
     await refreshBilling();
-  } else { S.favs = guestFavs(); S.billing = null; }
+  } else { S.favs = guestFavs(); S.follows = guestFollows(); S.billing = null; }
   startChatWatch();
 }
 
@@ -931,16 +1032,26 @@ function renderNav() {
 /* ---------- cuadrado de categorías: se toca y se eligen una o varias prendas ---------- */
 const catLabel = () => !S.cats.length ? 'Todas las prendas' : S.cats.length <= 2 ? S.cats.join(' y ') : S.cats.length + ' tipos de prenda';
 // v24.2 · barra de filtros: «Prendas» (desplegable) y «Precio máximo» (barra deslizante)
-// la barra va de 0 a 100 €; arriba del todo significa «sin límite» (100 € o más)
-const priceTop = () => 100;
+// v25 · también «Talla»; la barra de precio va de 0 a 500 € y arriba del todo significa «sin límite» (500 € o más)
+const priceTop = () => 500;
+// filtro de talla: una prenda pasa si tiene alguna de las tallas elegidas de su tipo (ropa o calzado);
+// si no has elegido ninguna talla de su tipo, o es de talla única, no se oculta
+function sizeOk(p, sel = S.sizeF) {
+  if (!sel.length || !p.sizes.length || p.sizes.includes(SIZE_UNI)) return true;
+  const kind = sizeKind(p.cat); if (kind === 'uni') return true;
+  const rel = sel.filter(x => (kind === 'pie' ? SIZES_PIE : SIZES_ROPA).includes(x));
+  return !rel.length || p.sizes.some(x => rel.includes(x));
+}
+const sizeLabel = () => !S.sizeF.length ? 'Todas' : S.sizeF.length <= 2 ? sortSizes(S.sizeF).join(', ') : S.sizeF.length + ' tallas';
 const priceTxt = v => v >= priceTop() ? money(priceTop()) + '+' : money(v);
 const priceOk = p => S.maxPrice == null || Number(p.price) <= S.maxPrice;
 function filterBar(where) {
   const top = priceTop(), v = S.maxPrice == null ? top : Math.min(S.maxPrice, top);
   return `<div class="fbar" role="group" aria-label="Filtros">
     <button type="button" class="fsel${S.cats.length ? ' on' : ''}" data-act="cats" data-v="${where}" aria-haspopup="dialog" aria-label="Prendas: ${esc(catLabel())}"><span><small>Prendas</small>${esc(!S.cats.length ? 'Todas' : S.cats.length === 1 ? S.cats[0] : S.cats.length + ' tipos')}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+    <button type="button" class="fsel${S.sizeF.length ? ' on' : ''}" data-act="sizes" aria-haspopup="dialog" aria-label="Talla: ${esc(sizeLabel())}"><span><small>Talla</small>${esc(sizeLabel())}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
     <div class="fprice"><div class="fp-top"><label for="fprice">Precio máximo</label><b id="fprice-v">${priceTxt(v)}</b></div>
-      <input type="range" id="fprice" min="0" max="${top}" step="5" value="${v}" aria-valuetext="${v >= top ? 'Sin límite' : money(v)}">
+      <input type="range" id="fprice" min="0" max="${top}" step="10" value="${v}" aria-valuetext="${v >= top ? 'Sin límite' : money(v)}">
       <div class="fp-ends" aria-hidden="true"><span>${money(0)}</span><span>${money(top)}+</span></div></div>
   </div>`;
 }
@@ -964,7 +1075,7 @@ function openCats(from) {
   if (!dlg.open) dlg.showModal();
 }
 function renderCats() {
-  const n = S.products.filter(p => (!S.onlyMine || fitsMe(p) !== false) && priceOk(p) && (!catDraft.length || catDraft.includes(p.cat))).length;
+  const n = S.products.filter(p => sizeOk(p) && priceOk(p) && (!catDraft.length || catDraft.includes(p.cat))).length;
   dlg.innerHTML = `<div class="catpick"><span class="grab" aria-hidden="true"></span><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button>
     <h2>¿Qué buscas?</h2><p class="muted">Elige una o varias.</p>
     <div class="catgrid" role="group" aria-label="Tipos de prenda">${C.categories.map(c => {
@@ -972,6 +1083,18 @@ function renderCats() {
       return `<button type="button" class="catopt" data-act="catpick" data-v="${esc(c)}" aria-pressed="${on}">${catArt(c)}<b>${esc(c)}</b><small>${cnt} ${cnt === 1 ? 'prenda' : 'prendas'}</small></button>`;
     }).join('')}</div>
     <div class="catacts"><button type="button" class="btn ghost" data-act="catclear"${catDraft.length ? '' : ' disabled'}>Borrar</button><button type="button" class="btn" data-act="catok">Ver ${n} ${n === 1 ? 'prenda' : 'prendas'}</button></div></div>`;
+}
+/* ---------- cuadro de tallas (v25) ---------- */
+let sizeDraft = [];
+function openSizes() { sizeDraft = [...S.sizeF]; renderSizes(); dlg.classList.add('catdlg'); if (!dlg.open) dlg.showModal(); }
+function renderSizes() {
+  const n = applyFilters(S.products, { sizes: sizeDraft }).length;
+  const row = (label, list) => `<div class="szpick"><b>${label}</b><div class="chips">${list.map(x => `<button type="button" class="chip" data-act="szpick" data-v="${esc(x)}" aria-pressed="${sizeDraft.includes(x)}">${esc(x)}</button>`).join('')}</div></div>`;
+  dlg.innerHTML = `<div class="catpick"><span class="grab" aria-hidden="true"></span><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button>
+    <h2>¿Qué talla buscas?</h2><p class="muted">Elige una o varias. Las prendas de talla única salen siempre.</p>
+    ${hasSizes() ? `<button type="button" class="chip mysz" data-act="szmine">Usar mis tallas · ${esc(mySizesLabel())}</button>` : ''}
+    ${row('Ropa', SIZES_ROPA)}${row('Calzado (EU)', SIZES_PIE)}
+    <div class="catacts"><button type="button" class="btn ghost" data-act="szclear"${sizeDraft.length ? '' : ' disabled'}>Borrar</button><button type="button" class="btn" data-act="szok">Ver ${n} ${n === 1 ? 'prenda' : 'prendas'}</button></div></div>`;
 }
 // dibujo pequeño de cada tipo de prenda (el mismo de las tarjetas, sin foto)
 function catArt(c) {
@@ -996,11 +1119,13 @@ function renderFoot() {
 /* ==========================================================
    TARJETAS
    ========================================================== */
+// v25 · el test se nota: etiqueta en cada prenda con lo que encaja contigo
+const fitTag = (m, cls = '') => m === null ? '' : `<span class="fit${m >= 70 ? ' hi' : ''}${cls ? ' ' + cls : ''}" title="Según tu test de estilo">${m >= 70 ? ICON.check : ''}${m >= 70 ? 'Encaja contigo' : 'Tu estilo'} · ${m} %</span>`;
 function cardHTML(p) {
   const m = matchPct(p), fav = S.favs.has(p.id);
   return `<article class="card">
     <button class="tile" data-act="open" data-id="${esc(p.id)}" aria-label="Ver ${esc(p.name)}" style="background:${tileBg(p)}">${pic(p, p.name)}${p.images[1] ? `<img class="alt" src="${esc(p.images[1])}" alt="" loading="lazy"><span class="nph" aria-hidden="true">${p.images.length} fotos</span>` : ''}</button>
-    ${m !== null ? `<span class="hang">${m} % para ti</span>` : ''}
+    ${fitTag(m, 'hang')}
     <button class="heart" data-act="fav" data-id="${esc(p.id)}" aria-pressed="${fav}" aria-label="${fav ? 'Quitar de guardados' : 'Guardar'}: ${esc(p.name)}">${ICON.heart}</button>
     <div class="meta"><div class="p">${money(p.price)}</div><div class="n">${esc(p.name)}</div><div class="b">${[sizeLine(p), esc(p.brand)].filter(Boolean).join(' · ')}${p.featured ? ' · <b>Destacado</b>' : ''}</div></div>
   </article>`;
@@ -1021,16 +1146,16 @@ function ranked(list) {
   else { const sc = p => (hasTaste() ? matchPct(p) : 0) + (p.featured ? 15 : 0); l.sort((a, b) => sc(b) - sc(a)); }
   return l;
 }
-function applyFilters(list) {
-  const q = S.q.trim().toLowerCase();
-  return list.filter(p => (!S.cats.length || S.cats.includes(p.cat)) && (S.maxPrice == null || Number(p.price) <= S.maxPrice) && (S.style === 'Todos' || p.tags.includes(S.style)) && (!S.onlyMine || fitsMe(p) !== false) && (!q ||(p.name + ' ' + p.brand + ' ' + p.tags.join(' ') + ' ' + p.cat).toLowerCase().includes(q)));
+function applyFilters(list, o = {}) {
+  const q = S.q.trim().toLowerCase(), sz = o.sizes || S.sizeF;
+  return list.filter(p => (!S.cats.length || S.cats.includes(p.cat)) && (S.maxPrice == null || Number(p.price) <= S.maxPrice) && (S.style === 'Todos' || p.tags.includes(S.style)) && sizeOk(p, sz) && (!q || (p.name + ' ' + p.brand + ' ' + p.tags.join(' ') + ' ' + p.cat + ' ' + p.city).toLowerCase().includes(q)));
 }
 
 /* marcas a partir de los productos publicados */
 function brandList(list = S.products) {
   const m = new Map();
   list.forEach(p => {
-    if (!m.has(p.brand_id)) m.set(p.brand_id, { id: p.brand_id, name: p.brand, bio: p.bio, contact: p.contact, logo: p.logo, cover: p.cover, items: [], color: p.color });
+    if (!m.has(p.brand_id)) m.set(p.brand_id, { id: p.brand_id, name: p.brand, bio: p.bio, contact: p.contact, logo: p.logo, cover: p.cover, items: [], color: p.color, city: p.city, story: p.story, ig: p.ig, web: p.web, badges: p.badges, shop: p.shop });
     m.get(p.brand_id).items.push(p);
   });
   return [...m.values()].sort((a, b) => b.items.length - a.items.length);
@@ -1116,28 +1241,38 @@ VIEWS.inicio = () => {
 
 /* --- Directorio de marcas --- */
 VIEWS.marcas = () => {
-  // v24 · portada: marcas en tarjetas grandes con foto y su nombre encima
-  const filtered = S.cats.length || S.maxPrice != null;
-  const brands = brandList(S.products.filter(p => (!S.cats.length || S.cats.includes(p.cat)) && priceOk(p)));
-  const hello = hasTaste() ? '' : `<button class="mtest" data-act="gustos"><b>${T('home.cta1', 'Haz el test de estilo')}</b><span>${T('home.ctasub', 'Gratis · 1 minuto · sin registrarte')}</span><span class="arr" aria-hidden="true">→</span></button>`;
+  // v25 · portada: qué es FOUND en una frase y tres pasos; después, las marcas (los filtros están en el Feed y en la búsqueda)
+  const brands = brandList();
+  const steps = [
+    hasTaste() ? ['gustos', T('dir.s1b', 'Ajusta tus gustos'), T('dir.s1bt', 'Ya sabemos tu estilo')] : ['gustos', T('dir.s1', 'Haz el test de estilo'), T('dir.s1t', '1 minuto, sin registrarte')],
+    ['feed', T('dir.s2', 'Descubre marcas nuevas'), T('dir.s2t', 'Las que van contigo, primero')],
+    ['', T('dir.s3', 'Compra en su web'), T('dir.s3t', 'Directamente a la marca')]
+  ];
   view.innerHTML = `<div class="wrap page has-tabbar mhome">
-    <div class="mhead"><h1>${T('dir.title', 'Marcas')}</h1></div>
-    ${filterBar('marcas')}
-    ${hello}
-    <div class="mgrid">${brands.length ? brands.map(brandTileHTML).join('') : filtered ? '<div class="empty">Ninguna marca tiene prendas con estos filtros.<br><button class="btn small" data-act="fclear">Quitar filtros</button></div>' : '<div class="empty">Aún no hay marcas con prendas publicadas.<br><a class="btn" href="#/vender">Sé la primera</a></div>'}</div>
+    <section class="mintro">
+      <h1>${T('dir.hero', 'Marcas que nunca habrías *encontrado*.')}</h1>
+      <p class="lead">${T('dir.lead', 'Pequeñas marcas que no salen en los anuncios ni en los grandes escaparates. Aquí las descubres según tu estilo y compras directamente en su web.')}</p>
+      <ol class="msteps">${steps.map(([a, t, sub], i) => {
+        const inner = `<span class="ms-n" aria-hidden="true">${i + 1}</span><span class="ms-t"><b>${t}</b><small>${sub}</small></span>`;
+        return `<li>${a === 'gustos' ? `<button type="button" class="ms-in" data-act="gustos">${inner}<span class="arr" aria-hidden="true">→</span></button>` : a === 'feed' ? `<a class="ms-in" href="#/feed">${inner}<span class="arr" aria-hidden="true">→</span></a>` : `<span class="ms-in">${inner}</span>`}</li>`;
+      }).join('')}</ol>
+    </section>
+    <div class="mhead"><h2>${T('dir.title', 'Marcas')}</h2>${brands.length ? `<span class="muted">${brands.length} ${brands.length === 1 ? 'marca' : 'marcas'}</span>` : ''}</div>
+    <div class="mgrid">${brands.length ? brands.map(brandTileHTML).join('') : '<div class="empty">Aún no hay marcas con prendas publicadas.<br><a class="btn" href="#/vender">Sé la primera</a></div>'}</div>
     ${isBrand() ? '' : `<div class="hband" style="margin-top:28px"><div><b>${T('band.title', '¿Tienes una marca? Publica en ' + C.appName + '.')}</b><span>${T('band.text', 'Los compradores con tu estilo te encuentran. La venta se hace en tu propia tienda.')}</span></div><a class="bandlink" href="#/vender">${T('band.cta2', 'Saber más')} <span aria-hidden="true">→</span></a></div>`}
   </div>`;
 };
-// tarjeta grande de marca: portada (o la foto de una de sus prendas) y el nombre en grande
+// tarjeta grande de marca: portada (o la foto de una de sus prendas), el nombre en grande y debajo su estilo, ciudad y precios
 function brandTileHTML(b) {
   const withPic = b.items.find(p => p.image);
   const bg = b.cover ? `<img src="${esc(b.cover)}" alt="" loading="lazy">` : withPic ? `<img src="${esc(withPic.image)}" alt="" loading="lazy">` : `<span class="mt-art" style="background:${tileBg(b.items[0])}">${pic(b.items[0])}</span>`;
+  const line = brandLine(b);
   return `<a class="mtile" href="#/marca/${esc(b.id)}" style="--bc:${esc(b.color)}">${bg}<span class="mt-shade" aria-hidden="true"></span>
+    ${badgesHTML(b.badges.slice(0, 2), 'mt-badges')}
     ${b.logo ? `<span class="mt-logo"><img src="${esc(b.logo)}" alt=""></span>` : ''}
-    <span class="mt-name">${esc(b.name)}</span><span class="mt-n">${b.items.length} ${b.items.length === 1 ? 'prenda' : 'prendas'}</span></a>`;
+    <span class="mt-foot"><span class="mt-name">${esc(b.name)}</span>
+    ${line.length ? `<span class="mt-line">${line.map(esc).join('<i aria-hidden="true">·</i>')}</span>` : ''}</span></a>`;
 }
-
-/* --- Vende en FOUND --- */
 /* Solicitud para entrar como marca (v24.7). Con «Solo marcas aprobadas» encendido,
    las marcas ya no se registran solas: piden entrar, el Creador las revisa y, si las aprueba,
    pueden crear su cuenta con ese correo. */
@@ -1271,7 +1406,7 @@ function feedOrder(list) {
   const score = p => {
     const m = taste ? matchPct(p) : 50;
     const seen = SEEN0[p.id], n = seen ? seen.n : 0;
-    let sc = m + (p.featured ? 12 : 0);
+    let sc = m + (p.featured ? 12 : 0) + (S.follows.has(p.brand_id) ? 14 : 0);
     if (!n) sc += FEED.unseenBoost; else if (!S.favs.has(p.id)) sc -= Math.min(35, FEED.seenPenalty * n);
     if (S.favs.has(p.id)) sc -= 10; // ya la tiene guardada: que deje sitio a otras
     const age = (now - new Date(p.created || 0).getTime()) / 864e5;
@@ -1312,7 +1447,8 @@ VIEWS.descubrir = () => {
         <a href="#/marca/${esc(p.brand_id)}" class="dbrand">${miniLogo(p.logo)}${esc(p.brand)}</a>
         <div class="n">${esc(p.name)}</div>
         <div class="p">${money(p.price)}</div>
-        <div class="chips">${m !== null ? `<span class="tag" style="background:var(--tagc);color:var(--tag-ink,#141414);font-weight:800">${m} % para ti</span>` : ''}${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
+        ${m !== null ? `<div class="fitrow">${fitTag(m)}</div>` : ''}
+        <div class="chips">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         ${p.sizes.length ? `<div class="szline"><span class="szlbl">${fitsMe(p) ? 'Hay tu talla' : 'Tallas'}</span>${sizeChips(p)}</div>` : ''}
       </div>
       <div class="rail">
@@ -1322,14 +1458,21 @@ VIEWS.descubrir = () => {
         <div>${buy}<small>Comprar</small></div>
       </div></section>`;
   }).join('');
-  const empty = `<section class="slide" style="background:var(--soft)"><div class="empty" style="margin:20px;background:var(--surface);grid-column:auto">${S.products.length ? 'No hay prendas con este filtro.' + (hasSizes() && S.onlyMine ? '<br><button class="btn small" data-act="onlymine" data-v="0">Ver también otras tallas</button>' : '') : 'Aún no hay productos. Si eres una marca, sube el primero desde tu panel.'}</div></section>`;
+  const empty = `<section class="slide" style="background:var(--soft)"><div class="empty" style="margin:20px;background:var(--surface);grid-column:auto">${S.products.length ? 'No hay prendas con estos filtros.<br><button class="btn small" data-act="fclear">Quitar filtros</button>' : 'Aún no hay productos. Si eres una marca, sube el primero desde tu panel.'}</div></section>`;
+  // v25 · a quien entra sin haber hecho el test se lo proponemos una vez: es lo que diferencia a FOUND
+  const askTest = N && !hasTaste() && !S.feedTestSeen && !lsGet('found_feed_test_no', false);
   view.innerHTML = `<div class="reelwrap">
     <div class="reel" id="reel" tabindex="0" aria-label="Prendas para ti. Usa las flechas arriba y abajo para cambiar de prenda">${N ? slides : empty}</div>
     <div class="reeltop" role="group" aria-label="Filtros">
-      <button class="chip" data-act="gustos">${hasTaste() ? 'Mis gustos' : 'Personalizar'}</button>
-      ${hasSizes() ? `<button class="chip" data-act="onlymine" data-v="${S.onlyMine ? 0 : 1}" aria-pressed="${S.onlyMine}" title="Solo prendas en tu talla (${esc(mySizesLabel())})">Mi talla</button>` : ''}
+      <button class="chip" data-act="gustos">${hasTaste() ? 'Mis gustos' : 'Haz el test'}</button>
       ${filterBar('feed')}
     </div>
+    ${askTest ? `<div class="feedtest" role="dialog" aria-modal="false" aria-labelledby="ft-t"><div class="ft-in">
+      <span class="eyebrow">${T('ftest.eyebrow', 'Antes de empezar')}</span>
+      <h2 id="ft-t">${T('ftest.title', '¿Te enseñamos primero lo que va *contigo*?')}</h2>
+      <p>${T('ftest.text', 'Responde 4 preguntas sobre tu estilo y ordenamos el feed para ti. En cada prenda verás cuánto encaja contigo.')}</p>
+      <div class="ft-acts"><button class="btn" data-act="gustos">${T('ftest.cta', 'Hacer el test')} <span class="arr" aria-hidden="true">→</span></button><button class="btn ghost" data-act="ftestno">${T('ftest.no', 'Ahora no')}</button></div>
+      <small>${T('ftest.sub', '1 minuto · gratis · sin registrarte')}</small></div></div>` : ''}
     ${N ? `<div class="count" id="cnt" aria-hidden="true">1 / ${N}</div>` : ''}
   </div>
   <div class="navbtns"><button data-act="rnav" data-v="-1" aria-label="Prenda anterior">${ICON.up}</button><button data-act="rnav" data-v="1" aria-label="Prenda siguiente">${ICON.down}</button></div>`;
@@ -1358,11 +1501,8 @@ VIEWS.explorar = () => {
       </select>
     </div>
     <div class="filters">
-      <div class="frow"><span>Prenda</span><div class="chips" role="group" aria-label="Categorías">${['Todo', ...C.categories].map(c => `<button class="chip" data-act="cat" data-v="${esc(c)}" aria-pressed="${c === 'Todo' ? !S.cats.length : S.cats.includes(c)}">${esc(c)}</button>`).join('')}</div></div>
+      ${filterBar('explorar')}
       <div class="frow"><span>Estilo</span><div class="chips" role="group" aria-label="Estilos">${['Todos', ...C.styles].map(c => `<button class="chip" data-act="fstyle" data-v="${esc(c)}" aria-pressed="${S.style === c}">${esc(c)}</button>`).join('')}</div></div>
-      <div class="frow"><span>Talla</span><div class="chips" role="group" aria-label="Talla">${hasSizes()
-        ? `<button class="chip" data-act="onlymine" data-v="1" aria-pressed="${S.onlyMine}">Solo mi talla · ${esc(mySizesLabel())}</button><button class="chip" data-act="onlymine" data-v="0" aria-pressed="${!S.onlyMine}">Todas las tallas</button><button class="chip ghostchip" data-act="gustos">Cambiar mi talla</button>`
-        : '<button class="chip ghostchip" data-act="gustos">Añade tu talla para ver solo lo que te vale →</button>'}</div></div>
     </div>
     <p class="muted rescount" id="rescount"></p>
     <div id="gridwrap"></div></div>`;
@@ -1372,31 +1512,46 @@ function fillGrid() {
   const w = $('#gridwrap'); if (!w) return;
   const list = ranked(applyFilters(S.products));
   const rc = $('#rescount'); if (rc) rc.textContent = list.length + (list.length === 1 ? ' prenda' : ' prendas');
-  w.innerHTML = `<div class="grid">${list.length ? list.map(cardHTML).join('') : `<div class="empty">No hay resultados. Prueba otra categoría o busca otra cosa.${hasSizes() && S.onlyMine ? '<br><button class="btn small" data-act="onlymine" data-v="0">Ver también otras tallas</button>' : ''}</div>`}</div>`;
+  const anyF = S.cats.length || S.sizeF.length || S.maxPrice != null || S.style !== 'Todos';
+  w.innerHTML = `<div class="grid">${list.length ? list.map(cardHTML).join('') : `<div class="empty">No hay resultados. Prueba otra búsqueda${anyF ? ' o quita los filtros.<br><button class="btn small" data-act="fclear">Quitar filtros</button>' : '.'}</div>`}</div>`;
 }
 
 /* --- Guardados --- */
 VIEWS.guardados = () => {
   const list = ranked(S.products.filter(p => S.favs.has(p.id)));
+  const fb = brandList().filter(b => S.follows.has(b.id));
+  const followed = fb.length ? `<section class="followrow"><h2>Marcas que sigues <span class="muted">${fb.length}</span></h2><div class="bmini">${fb.map(b => `<a href="#/marca/${esc(b.id)}">${avatar(b)}<b>${esc(b.name)}</b><small>${b.items.length} ${b.items.length === 1 ? 'prenda' : 'prendas'}</small></a>`).join('')}</div></section>` : '';
   view.innerHTML = `<div class="wrap page has-tabbar"><div class="pagehead"><div><span class="eyebrow">${T('fav.eyebrow', 'Tu selección')}</span><h1 style="margin-top:12px">${T('fav.title', 'Favoritas')}</h1><p class="muted">${list.length ? list.length + (list.length === 1 ? ' prenda guardada.' : ' prendas guardadas.') : 'Las prendas que guardes aparecerán aquí.'}</p></div></div>
-    ${!S.user && list.length ? `<div class="card-box" style="margin-bottom:20px"><b>Crea una cuenta para no perder tus guardados.</b> <a href="#/entrar">Entrar o registrarme</a></div>` : ''}
+    ${!S.user && (list.length || fb.length) ? `<div class="card-box" style="margin-bottom:20px"><b>Crea una cuenta para no perder tus guardados.</b> <a href="#/entrar">Entrar o registrarme</a></div>` : ''}
+    ${followed}${followed ? '<h2 class="favh">Prendas guardadas</h2>' : ''}
     <div class="grid">${list.length ? list.map(cardHTML).join('') : `<div class="empty">Aún no has guardado nada.<br>Toca el corazón en las prendas que te gusten.<br><a class="btn" href="#/feed">Ir al feed</a></div>`}</div></div>`;
 };
 
 /* --- Perfil público de marca --- */
 VIEWS.marca = id => {
   const list = ranked(S.products.filter(p => p.brand_id === id));
-  const b = list[0];
   const own = S.user && S.user.id === id && S.profile;
-  const bo = b ? { name: b.brand, color: b.color, logo: b.logo, cover: b.cover, bio: b.bio, contact: b.contact }
-    : own ? { name: S.profile.brand_name || 'Tu marca', color: '#1C2240', logo: S.profile.logo_url, cover: S.profile.cover_url, bio: S.profile.brand_bio, contact: S.profile.contact_email }
-    : { name: 'Marca', color: '#141414' };
-  const minP = list.length ? Math.min(...list.map(p => p.price)) : 0;
-  view.innerHTML = `<div class="wrap page has-tabbar"><div class="brandhero${bo.cover ? ' hascover' : ''}" style="background:${bo.cover ? 'var(--deep)' : b ? softBg(b.color) : 'var(--soft)'}">
+  const fromProfile = pr => ({ name: pr.brand_name || 'Tu marca', color: '#1C2240', logo: pr.logo_url, cover: pr.cover_url, bio: pr.brand_bio, contact: pr.contact_email, city: pr.brand_city || '', story: pr.brand_story || '', ig: pr.instagram || '', web: isUrl(pr.website) ? pr.website : '', badges: (pr.brand_badges || []).filter(x => BADGES.includes(x)), shop: normShop(pr.shop_info) });
+  const bo = { ...(list.length ? brandList(list)[0] : own ? fromProfile(S.profile) : { name: 'Marca', color: '#141414', badges: [], shop: normShop() }), items: list };
+  const line = brandLine(bo), fol = S.follows.has(id), nf = S.fcounts[id] || 0;
+  const links = [
+    isUrl(bo.web) ? `<a class="blink" href="${esc(bo.web)}" target="_blank" rel="noopener noreferrer">${ICON.globe}<span>${esc(webLabel(bo.web))}</span></a>` : '',
+    igOk(bo.ig) ? `<a class="blink" href="https://instagram.com/${esc(bo.ig)}" target="_blank" rel="noopener noreferrer">${ICON.ig}<span>@${esc(bo.ig)}</span></a>` : '',
+    bo.contact ? `<a class="blink" href="mailto:${esc(bo.contact)}">${ICON.mail}<span>Escribir a la marca</span></a>` : ''
+  ].filter(Boolean).join('');
+  const shop = shopLines(bo.shop);
+  view.innerHTML = `<div class="wrap page has-tabbar"><div class="brandhero${bo.cover ? ' hascover' : ''}" style="background:${bo.cover ? 'var(--deep)' : list.length ? softBg(bo.color) : 'var(--soft)'}">
     ${bo.cover ? `<img class="bh-cover" src="${esc(bo.cover)}" alt="Portada de ${esc(bo.name)}">` : ''}${avatar(bo, true)}
-    <div><h1>${esc(bo.name)}</h1>${bo.bio ? `<p>${esc(bo.bio)}</p>` : ''}
-      ${list.length ? `<div class="kpis"><div><b>${list.length}</b>${list.length === 1 ? 'prenda' : 'prendas'}</div><div><b>${money(minP)}</b>desde</div></div>` : ''}</div>
-    <div class="bh-acts">${bo.contact ? `<a class="btn ghost small" href="mailto:${esc(bo.contact)}">Contactar</a>` : ''}<button class="btn ghost small" data-act="share" data-v="m" data-id="${esc(id)}">${ICON.share} Compartir</button></div></div>
+    <div><h1>${esc(bo.name)}</h1>${line.length ? `<p class="bh-line">${line.map(esc).join(' · ')}</p>` : ''}${bo.bio ? `<p>${esc(bo.bio)}</p>` : ''}
+      ${badgesHTML(bo.badges, 'bh-badges')}
+      <div class="kpis">${list.length ? `<div><b>${list.length}</b>${list.length === 1 ? 'prenda' : 'prendas'}</div>` : ''}<div><b data-fcount="${esc(id)}">${nf}</b>${nf === 1 ? 'seguidor' : 'seguidores'}</div></div></div>
+    <div class="bh-acts">${own ? '' : `<button class="btn small followbtn" data-act="follow" data-id="${esc(id)}" aria-pressed="${fol}">${fol ? 'Siguiendo' : 'Seguir'}</button>`}<button class="btn ghost small" data-act="share" data-v="m" data-id="${esc(id)}">${ICON.share} Compartir</button></div></div>
+    ${bo.story || links || shop.length ? `<section class="babout">
+      ${bo.story ? `<div class="bstory"><h2>${T('brand.story', 'Su historia')}</h2><p>${esc(bo.story)}</p></div>` : ''}
+      <div class="bside">${links ? `<div class="blinks">${links}</div>` : ''}${shop.length ? `<div class="shopbox"><b>Comprar a ${esc(bo.name)}</b>${shop.map(([k, t]) => `<span class="sl sl-${k}">${ICON[k === 'ship' ? 'truck' : k === 'time' ? 'clock' : 'ret']}${esc(t)}</span>`).join('')}</div>` : ''}</div>
+    </section>` : ''}
+    ${own && (!bo.logo || !bo.cover) ? '<p class="card-box warnbox">Tu página aún no está completa: sube el logo y la portada desde tu <a href="#/panel">panel</a>. Sin ellos no puedes publicar prendas nuevas.</p>' : ''}
+    <h2 class="bgrid-h">${list.length ? 'Sus prendas' : ''}</h2>
     <div class="grid">${list.length ? list.map(cardHTML).join('') : '<div class="empty">Esta marca aún no tiene productos.</div>'}</div></div>`;
 };
 
@@ -2411,6 +2566,7 @@ function renderPanel() {
         ${act ? '' : paywallHTML()}
         <section class="card-box" aria-label="Producto"${act ? '' : ' hidden'}>
           <h2 style="margin-bottom:14px">${ed ? 'Editar producto' : 'Sube un producto'}</h2>
+          ${!ed && (!S.profile.logo_url || !S.profile.cover_url) ? `<p class="warnbox">Antes de publicar, completa tu <b>Perfil de marca</b> (más abajo): ${[!S.profile.logo_url ? 'el logo' : '', !S.profile.cover_url ? 'la foto de portada' : ''].filter(Boolean).join(' y ')}. Es lo primero que ven los compradores.</p>` : ''}
           <label class="field"><span>Nombre del producto</span><input type="text" id="f-name" maxlength="80" value="${esc(d.name)}" placeholder="Ej. Camisa oversize lino"></label>
           <div class="row2">
             <label class="field"><span>Precio (${esc(C.currency)})</span><input type="number" id="f-price" min="0.5" step="0.5" value="${esc(d.price)}"></label>
@@ -2433,16 +2589,35 @@ function renderPanel() {
             <div class="bp-row"><span class="bp-logo" id="bp-logo">${S.profile.logo_url ? `<img src="${esc(S.profile.logo_url)}" alt="">` : esc(initial(S.profile.brand_name))}</span><b id="bp-name">${esc(S.profile.brand_name || 'Tu marca')}</b></div>
           </div>
           <div class="row2">
-            <div class="field"><span>Logo</span><input type="file" id="p-logo" accept="image/png,image/jpeg,image/webp">
-              <small class="muted">Cuadrado, mínimo 300 × 300 px. Un PNG con fondo transparente queda mejor.</small>
-              ${S.profile.logo_url ? '<button type="button" class="linkbtn" data-act="rmimg" data-v="logo">Quitar logo</button>' : ''}</div>
-            <div class="field"><span>Foto de portada</span><input type="file" id="p-cover" accept="image/png,image/jpeg,image/webp">
-              <small class="muted">Horizontal, mínimo 1600 × 600 px. Se recorta para adaptarse a cada pantalla.</small>
-              ${S.profile.cover_url ? '<button type="button" class="linkbtn" data-act="rmimg" data-v="cover">Quitar portada</button>' : ''}</div>
+            <div class="field"><span>Logo <em class="req">obligatorio</em></span><input type="file" id="p-logo" accept="image/png,image/jpeg,image/webp">
+              <small class="muted">${S.profile.logo_url ? 'Para cambiarlo, elige otra imagen. ' : ''}Cuadrado, mínimo 300 × 300 px. Un PNG con fondo transparente queda mejor.</small></div>
+            <div class="field"><span>Foto de portada <em class="req">obligatoria</em></span><input type="file" id="p-cover" accept="image/png,image/jpeg,image/webp">
+              <small class="muted">${S.profile.cover_url ? 'Para cambiarla, elige otra imagen. ' : ''}Horizontal, mínimo 1600 × 600 px. Es lo que se ve en la portada de ${esc(C.appName)}.</small></div>
           </div>
           <label class="field"><span>Nombre de la marca</span><input type="text" id="p-brand" maxlength="60" value="${esc(S.profile.brand_name || '')}"></label>
-          <label class="field"><span>Correo de contacto público</span><input type="email" id="p-contact" value="${esc(S.profile.contact_email || '')}"></label>
-          <label class="field"><span>Quiénes sois</span><textarea id="p-bio" maxlength="300">${esc(S.profile.brand_bio || '')}</textarea></label>
+          <div class="row2">
+            <label class="field"><span>Ciudad</span><input type="text" id="p-city" maxlength="60" value="${esc(S.profile.brand_city || '')}" placeholder="Ej. Bilbao" autocomplete="address-level2"></label>
+            <label class="field"><span>Correo de contacto público</span><input type="email" id="p-contact" value="${esc(S.profile.contact_email || '')}"></label>
+          </div>
+          <div class="row2">
+            <label class="field"><span>Instagram</span><input type="text" id="p-ig" maxlength="80" value="${esc(S.profile.instagram ? '@' + S.profile.instagram : '')}" placeholder="@tumarca" autocomplete="off"></label>
+            <label class="field"><span>Web o tienda online</span><input type="url" id="p-web" maxlength="300" value="${esc(S.profile.website || '')}" placeholder="https://tumarca.com"></label>
+          </div>
+          <label class="field"><span>Frase corta</span><textarea id="p-bio" maxlength="160" rows="2" placeholder="Ej. Lino europeo cosido en Bilbao en tiradas cortas.">${esc(S.profile.brand_bio || '')}</textarea><small class="muted">Sale debajo de vuestro nombre. Máximo 160 caracteres.</small></label>
+          <label class="field"><span>Vuestra historia</span><textarea id="p-story" maxlength="1500" rows="5" placeholder="Cómo empezasteis, quién hace las prendas, dónde, con qué materiales…">${esc(S.profile.brand_story || '')}</textarea><small class="muted">Es lo que convence a quien no os conoce. Sale en vuestra página.</small></label>
+          <div class="field"><span>Sellos (elige los que sean verdad)</span><div class="chips" id="p-badges">${BADGES.map(x => `<button type="button" class="chip" data-act="pbadge" data-v="${esc(x)}" aria-pressed="${(S.profile.brand_badges || []).includes(x)}">${esc(x)}</button>`).join('')}</div></div>
+          <fieldset class="shopfs"><legend>Envío, entrega y devoluciones</legend>
+            <p class="muted">Lo rellenas una vez y sale en todas tus prendas. Es lo que más se pregunta antes de comprar.</p>
+            ${(() => { const sh = normShop(S.profile.shop_info), v = x => x == null ? '' : x; return `<div class="row2">
+              <label class="field"><span>Gastos de envío (${esc(C.currency)})</span><input type="number" id="s-ship" min="0" max="999" step="0.01" value="${v(sh.ship)}" placeholder="0 = gratis"></label>
+              <label class="field"><span>Envío gratis desde (${esc(C.currency)})</span><input type="number" id="s-free" min="0" max="9999" step="1" value="${v(sh.freeFrom)}" placeholder="Opcional"></label></div>
+            <div class="row2">
+              <label class="field"><span>Entrega: de… días laborables</span><input type="number" id="s-dmin" min="0" max="90" step="1" value="${v(sh.dMin)}" placeholder="Ej. 2"></label>
+              <label class="field"><span>…a días laborables</span><input type="number" id="s-dmax" min="0" max="90" step="1" value="${v(sh.dMax)}" placeholder="Ej. 4"></label></div>
+            <div class="row2">
+              <label class="field"><span>Días para devolver</span><input type="number" id="s-ret" min="0" max="365" step="1" value="${v(sh.ret)}" placeholder="0 = no se aceptan"></label>
+              <label class="check retfree"><input type="checkbox" id="s-retfree"${sh.retFree ? ' checked' : ''}> <span>La devolución es gratis</span></label></div>`; })()}
+          </fieldset>
           <p class="msg" id="pmsg" role="alert"></p>
           <button class="btn ghost" id="psave" data-act="saveprofile">Guardar perfil</button>
         </section>
@@ -2454,7 +2629,7 @@ function renderPanel() {
           <div class="stat hl"><b>${S.ev ? views : '—'}</b><span>${views === 1 ? 'clic' : 'clics'} en tus prendas</span></div>
           <div class="stat hl"><b>${S.ev ? buys : '—'}</b><span>${buys === 1 ? 'visita' : 'visitas'} a tu tienda</span></div>
           <div class="stat"><b>${saves}</b><span>guardados <small>(siempre)</small></span></div>
-          <div class="stat"><b>${mine.length}</b><span>productos</span></div>
+          <div class="stat"><b>${S.fcounts[S.user.id] || 0}</b><span>${(S.fcounts[S.user.id] || 0) === 1 ? 'seguidor' : 'seguidores'}</span></div>
         </div>
         ${S.ev && views ? `<p class="conv">El <b>${Math.round(buys / views * 100)} %</b> de los clics acaban en tu tienda.</p>` : S.ev ? '<p class="conv muted">Los clics aparecerán aquí cuando los compradores abran tus prendas.</p>' : ''}
         <div class="plist">${mine.length ? mine.map(p => `<div class="pitem"><div class="th" style="background:${tileBg(p)}">${pic(p)}</div>
@@ -2508,6 +2683,7 @@ async function publish() {
   const f = readForm(), photos = S.formPhotos.slice(0, MAX_PHOTOS), newPics = photos.filter(x => x.file).length;
   const bad = t => { m.classList.add('err'); m.textContent = t; };
   if (!f.name) return bad('Escribe el nombre del producto.');
+  if (!S.editing && !isAdmin() && (!S.profile.logo_url || !S.profile.cover_url)) return bad('Antes de publicar, sube el logo y la foto de portada de tu marca en «Perfil de marca».');
   if (!(f.price > 0)) return bad('Indica un precio mayor que 0.');
   if (!S.formSizes.length) return bad('Marca las tallas que tienes disponibles (o «Talla única»).');
   if (!S.formTags.length) return bad('Elige al menos una etiqueta de estilo: así te encuentran los compradores adecuados.');
@@ -2620,12 +2796,20 @@ function openProduct(id) {
   track(p.id, 'view'); logSite('page', 'prenda');
   const m = matchPct(p), fav = S.favs.has(p.id), fit = fitsMe(p);
   const sim = q => q.tags.filter(t => p.tags.includes(t)).length * 2 + (q.cat === p.cat ? 1 : 0) + (q.brand_id === p.brand_id ? 1 : 0);
-  const related = S.products.filter(q => q.id !== p.id && sim(q) > 0).sort((a, b) => sim(b) - sim(a) || (matchPct(b) || 0) - (matchPct(a) || 0)).slice(0, 4);
+  // también te puede gustar: primero las parecidas; si hay pocas, se completa con lo que mejor encaja contigo (nunca un callejón sin salida)
+  let related = S.products.filter(q => q.id !== p.id && sim(q) > 0).sort((a, b) => sim(b) - sim(a) || (matchPct(b) || 0) - (matchPct(a) || 0)).slice(0, 6);
+  if (related.length < 6) related = related.concat(ranked(S.products.filter(q => q.id !== p.id && !related.includes(q))).slice(0, 6 - related.length));
+  const site = isUrl(p.buy_url) ? webLabel(new URL(p.buy_url).hostname) : '';
   const buy = isUrl(p.buy_url)
-    ? `<a class="btn" href="${esc(p.buy_url)}" target="_blank" rel="noopener noreferrer" data-track="buy" data-id="${esc(p.id)}">Comprar en la tienda de ${esc(p.brand)}</a>`
-    : (p.contact ? `<a class="btn" data-track="buy" data-id="${esc(p.id)}" href="mailto:${esc(p.contact)}?subject=${encodeURIComponent('Me interesa: ' + p.name)}">Preguntar a ${esc(p.brand)}</a>` : '<span class="muted">Esta marca aún no ha añadido un enlace de compra.</span>');
+    ? `<a class="btn buybtn" href="${esc(p.buy_url)}" target="_blank" rel="noopener noreferrer" data-track="buy" data-id="${esc(p.id)}">Comprar en la web de ${esc(p.brand)} ${ICON.out}</a>
+       <p class="leave">${ICON.out}<span>Sales de ${esc(C.appName)} a <b>${esc(site)}</b>. Allí pagas y ${esc(p.brand)} te lo envía.</span></p>`
+    : (p.contact ? `<a class="btn buybtn" data-track="buy" data-id="${esc(p.id)}" href="mailto:${esc(p.contact)}?subject=${encodeURIComponent('Me interesa: ' + p.name)}">Preguntar a ${esc(p.brand)}</a>
+       <p class="leave">${ICON.mail}<span>Aún no tiene enlace de compra: se abre tu correo para escribir a la marca.</span></p>` : '<span class="muted">Esta marca aún no ha añadido un enlace de compra.</span>');
+  const shop = shopLines(p.shop);
+  const shopBox = `<div class="shopbox">${shop.length ? `<b>Envío y devoluciones</b>${shop.map(([k, t]) => `<span class="sl sl-${k}">${ICON[k === 'ship' ? 'truck' : k === 'time' ? 'clock' : 'ret']}${esc(t)}</span>`).join('')}` : `<b>Envío y devoluciones</b><span class="sl">${ICON.truck}${isUrl(p.buy_url) ? 'Consulta los gastos de envío y las devoluciones en la web de la marca.' : 'Pregunta a la marca por el envío y las devoluciones.'}</span>`}</div>`;
+  const shareTxt = `Mira esto en ${C.appName}: ${p.name} de ${p.brand}, ${money(p.price)}`;
   dlg.classList.remove("catdlg"); dlg.innerHTML = `<div style="position:relative"><span class="grab" aria-hidden="true"></span><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button>
-    <div class="dgrid"><div class="art" style="background:${tileBg(p)}">${galleryHTML(p)}${m !== null ? `<span class="hang">${m} % para ti</span>` : ''}</div>
+    <div class="dgrid"><div class="art" style="background:${tileBg(p)}">${galleryHTML(p)}${fitTag(m, 'hang')}</div>
     <div class="dinfo">
       <a href="#/marca/${esc(p.brand_id)}" data-act="closeDlg" class="muted dbrand">${miniLogo(p.logo)}${esc(p.brand)}</a>
       <h2>${esc(p.name)}</h2><div class="price">${money(p.price)}</div>
@@ -2640,11 +2824,13 @@ function openProduct(id) {
       ].filter(Boolean).join('<br>')}</span></div>` : ''}
       <p class="grow">${esc(p.desc || 'Sin descripción todavía.')}</p>
       <div class="buybar">${buy}</div>
+      ${shopBox}
       <div class="dacts"><button class="btn ghost" data-act="fav" data-id="${esc(p.id)}" aria-pressed="${fav}">${fav ? 'Quitar de guardados' : 'Guardar'}</button>
-        <button class="btn ghost" data-act="share" data-v="p" data-id="${esc(p.id)}">${ICON.share} Compartir</button></div>
+        <a class="btn ghost wabtn" href="https://wa.me/?text=${encodeURIComponent(shareTxt + ' ' + shareUrl('p', p.id))}" target="_blank" rel="noopener noreferrer" data-act="walink">${ICON.wa} WhatsApp</a>
+        <button class="btn ghost" data-act="copylink" data-v="p" data-id="${esc(p.id)}">${ICON.link} Copiar enlace</button></div>
       ${isAdmin() || (S.user && S.user.id === p.brand_id) ? '' : `<div class="repwrap" id="repbox"><button class="linkbtn replink" data-act="report" data-id="${esc(p.id)}">Denunciar esta prenda</button></div>`}
     </div></div>
-    ${related.length ? `<div class="related"><h3>También te puede gustar</h3><div class="rgrid">${related.map(r => `<button data-act="open" data-id="${esc(r.id)}" aria-label="Ver ${esc(r.name)}"><span class="rt" style="background:${tileBg(r)}">${pic(r)}</span><span class="rn">${esc(r.name)}</span><span class="rp">${money(r.price)}</span></button>`).join('')}</div></div>` : ''}</div>`;
+    ${related.length ? `<div class="related"><h3>También te puede gustar</h3><div class="rgrid">${related.map(r => `<button data-act="open" data-id="${esc(r.id)}" aria-label="Ver ${esc(r.name)}"><span class="rt" style="background:${tileBg(r)}">${pic(r)}</span><span class="rn">${esc(r.name)}</span><span class="rb">${esc(r.brand)}</span><span class="rp">${money(r.price)}</span></button>`).join('')}</div></div>` : ''}</div>`;
   if (!dlg.open) dlg.showModal(); else dlg.scrollTop = 0;
   setMeta(`${p.name} de ${p.brand}`, p.desc || `${p.name} de ${p.brand} por ${money(p.price)}. ${p.tags.join(', ')}.`, { ld: productLD(p) });
   initGallery();
@@ -2760,6 +2946,29 @@ function favBadge() {
     c.textContent = S.favs.size; c.setAttribute('aria-label', S.favs.size + ' favoritas');
   });
 }
+/* ---------- seguir marcas (v25) ---------- */
+let followBusy = false;
+async function toggleFollow(id) {
+  if (followBusy) return; followBusy = true;
+  const on = !S.follows.has(id);
+  on ? S.follows.add(id) : S.follows.delete(id);
+  S.fcounts[id] = Math.max(0, (S.fcounts[id] || 0) + (on ? 1 : -1));
+  const sync = () => {
+    $$('[data-act="follow"]').filter(b => b.dataset.id === id).forEach(b => { b.setAttribute('aria-pressed', S.follows.has(id)); b.textContent = S.follows.has(id) ? 'Siguiendo' : 'Seguir'; });
+    $$('[data-fcount]').filter(b => b.dataset.fcount === id).forEach(b => { b.textContent = S.fcounts[id] || 0; if (b.nextSibling) b.nextSibling.textContent = (S.fcounts[id] || 0) === 1 ? 'seguidor' : 'seguidores'; });
+  };
+  sync();
+  try {
+    if (S.user) await api.setFollow(S.user.id, id, on);
+    else lsSet('found_guest_follows', [...S.follows]);
+    const b = brandList().find(x => x.id === id);
+    toast(on ? (S.user ? `Sigues a ${b ? b.name : 'esta marca'}. Sus prendas te saldrán antes en el feed.` : `Sigues a ${b ? b.name : 'esta marca'}. Crea una cuenta para no perderlo.`) : 'Has dejado de seguir esta marca');
+  } catch (e) {
+    on ? S.follows.delete(id) : S.follows.add(id);
+    S.fcounts[id] = Math.max(0, (S.fcounts[id] || 0) + (on ? -1 : 1)); sync();
+    toast(e.message);
+  } finally { followBusy = false; }
+}
 async function toggleFav(id, forceOn) {
   const on = forceOn === undefined ? !S.favs.has(id) : forceOn;
   if (on === S.favs.has(id)) return;
@@ -2786,10 +2995,20 @@ document.addEventListener('click', async e => {
     case 'galto': galGo(+v, true); break;
     case 'fav': toggleFav(id); break;
     case 'cats': openCats(v); break;
+    case 'pbadge': b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true'); break;
+    case 'copylink': { const u = shareUrl(v, id); logSite('share'); try { await navigator.clipboard.writeText(u); toast('Enlace copiado. Pégalo donde quieras.'); } catch { copyFallback(u); } break; }
+    case 'walink': logSite('share'); break;
+    case 'ftestno': S.feedTestSeen = true; lsSet('found_feed_test_no', true); { const ft = $('.feedtest'); if (ft) ft.remove(); } { const r = $('#reel'); if (r) r.focus(); } break;
+    case 'follow': toggleFollow(id); break;
     case 'catpick': catDraft = catDraft.includes(v) ? catDraft.filter(c => c !== v) : [...catDraft, v]; renderCats(); break;
     case 'catclear': catDraft = []; renderCats(); break;
-    case 'catok': S.cats = [...catDraft]; S.q = ''; closeDlg(); if (VIEWS[S.route] && (S.route === 'descubrir' || S.route === 'marcas')) VIEWS[S.route](); else go('feed'); break;
-    case 'fclear': S.cats = []; S.maxPrice = null; VIEWS[S.route] && VIEWS[S.route](); break;
+    case 'catok': S.cats = [...catDraft]; if (S.route !== 'explorar') S.q = ''; closeDlg(); if (S.route === 'descubrir' || S.route === 'explorar') VIEWS[S.route](); else go('feed'); break;
+    case 'fclear': S.cats = []; S.maxPrice = null; S.sizeF = []; S.style = 'Todos'; VIEWS[S.route] && VIEWS[S.route](); break;
+    case 'sizes': openSizes(); break;
+    case 'szpick': tgl(sizeDraft, v); renderSizes(); break;
+    case 'szmine': sizeDraft = [...mySizes()]; renderSizes(); break;
+    case 'szclear': sizeDraft = []; renderSizes(); break;
+    case 'szok': S.sizeF = sortSizes(sizeDraft); closeDlg(); if (S.route === 'descubrir' || S.route === 'explorar') VIEWS[S.route](); else go('feed'); break;
     case 'cat': S.cats = v === 'Todo' ? [] : (S.cats.includes(v) ? S.cats.filter(c => c !== v) : [...S.cats, v]); VIEWS[S.route] && VIEWS[S.route](); break;
     case 'gustos': S.draft = null; go('gustos'); break;
     case 'style': S.cats = []; S.q = ''; S.style = v; go('explorar'); break;
@@ -2841,7 +3060,7 @@ document.addEventListener('click', async e => {
     case 'apply': {
       if (!S.draft.styles.length) { $('#qerr').textContent = 'Elige al menos un estilo para personalizar tu feed.'; break; }
       S.taste = { styles: [...S.draft.styles], cats: [...S.draft.cats], budget: S.draft.budget, sizes: sortSizes(S.draft.sizes || []) };
-      lsSet('found_taste', S.taste); S.draft = null; S.onlyMine = true; logSite('test');
+      lsSet('found_taste', S.taste); S.draft = null; S.sizeF = [...mySizes()]; logSite('test');
       if (S.user) { try { await api.saveProfile(S.user.id, { styles: S.taste.styles, cats: S.taste.cats, budget: S.taste.budget, sizes: S.taste.sizes });S.profile = { ...S.profile, ...S.taste }; } catch (err) { toast('Tus gustos se guardaron en este dispositivo, pero no en tu cuenta: ' + err.message); } }
       toast('Gustos guardados'); go('feed'); break; }
     case 'authmode': S.authMode = v; if (S.route !== 'entrar') go('entrar'); else VIEWS.entrar(); break;
@@ -2888,9 +3107,25 @@ document.addEventListener('click', async e => {
     case 'admindel': if (confirm('¿Eliminar este producto de la web? No se puede deshacer.')) { try { await api.removeProduct(id); await refreshProducts(); renderAdminTab(); toast('Producto eliminado'); } catch (err) { toast('No se pudo eliminar: ' + err.message); } } break;
     case 'saveprofile': {
       const m = $('#pmsg'); m.className = 'msg';
-      const patch = { brand_name: $('#p-brand').value.trim(), contact_email: $('#p-contact').value.trim(), brand_bio: $('#p-bio').value.trim() };
-      if (!patch.brand_name) { m.classList.add('err'); m.textContent = 'La marca necesita un nombre.'; break; }
+      const perr = t => { m.classList.add('err'); m.textContent = t; };
+      const patch = { brand_name: $('#p-brand').value.trim(), contact_email: $('#p-contact').value.trim(), brand_bio: $('#p-bio').value.trim().slice(0, 160) };
+      if (!patch.brand_name) { perr('La marca necesita un nombre.'); break; }
+      if (patch.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patch.contact_email)) { perr('El correo de contacto no parece correcto.'); break; }
+      // v25 · perfil completo
+      patch.brand_city = $('#p-city').value.trim().slice(0, 60) || null;
+      patch.brand_story = $('#p-story').value.trim().slice(0, 1500) || null;
+      const ig = igHandle($('#p-ig').value);
+      if (ig && !igOk(ig)) { perr('Escribe vuestro usuario de Instagram, por ejemplo @tumarca.'); break; }
+      patch.instagram = ig || null;
+      let web = $('#p-web').value.trim(); if (web && !/^https?:\/\//i.test(web)) web = 'https://' + web;
+      if (web && !isUrl(web)) { perr('La dirección de la web no parece correcta.'); break; }
+      patch.website = web || null;
+      patch.brand_badges = $$('#p-badges [aria-pressed="true"]').map(x => x.dataset.v).filter(x => BADGES.includes(x));
+      const sh = normShop({ ship: $('#s-ship').value, freeFrom: $('#s-free').value, dMin: $('#s-dmin').value, dMax: $('#s-dmax').value, ret: $('#s-ret').value, retFree: $('#s-retfree').checked });
+      patch.shop_info = Object.fromEntries(Object.entries(sh).filter(([k, x]) => x != null && !(k === 'retFree' && !x)));
       const files = { logo: $('#p-logo').files[0], cover: $('#p-cover').files[0] };
+      if (!files.logo && !S.profile.logo_url) { perr('Sube el logo de tu marca: es obligatorio.'); break; }
+      if (!files.cover && !S.profile.cover_url) { perr('Sube una foto de portada: es obligatoria. Es lo que se ve en la portada de ' + C.appName + '.'); break; }
       const badF = Object.values(files).find(f => f && (!/^image\/(png|jpeg|webp)$/.test(f.type) || f.size > 15e6));
       if (badF) { m.classList.add('err'); m.textContent = 'Las imágenes deben ser PNG, JPG o WEBP y pesar menos de 15 MB.'; break; }
       const btn = $('#psave'); btn.disabled = true; btn.textContent = files.logo || files.cover ? 'Subiendo imágenes…' : 'Guardando…';
@@ -3167,6 +3402,7 @@ document.addEventListener('submit', e => {
   if (sharedP || sharedM) history.replaceState(null, '', location.pathname + (sharedM ? '#/marca/' + encodeURIComponent(sharedM) : (location.hash || '#/marcas')));
   if (configured && !hasLib) toast('No se pudo cargar Supabase. Revisa tu conexión y recarga la página.');
   try { await afterAuth(); } catch (e) { S.favs = guestFavs(); toast('No se pudo comprobar tu sesión: ' + e.message); }
+  S.sizeF = [...mySizes()];
   try { applySettings(await api.getSettings()); } catch { applySettings(null); }
   await refreshProducts();
   api.onChange(async () => { if (!S.user) { await afterAuth(); await refreshProducts(); route(); } });

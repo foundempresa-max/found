@@ -67,13 +67,12 @@
     banner.className = 'ck-banner';
     banner.setAttribute('role', 'region');
     banner.setAttribute('aria-label', 'Aviso de cookies');
+    // v25 · barra fina: una línea de texto y tres botones; «Rechazar» y «Aceptar» igual de visibles (AEPD)
     banner.innerHTML = `<div class="ck-in">
-      <p><b>Tu privacidad, tu decisión.</b> Usamos lo imprescindible para que la web funcione (tu sesión, tus gustos y tus guardados).
-      Con tu permiso, también medimos las visitas de forma anónima para mejorar ${C.appName || 'la web'}.
-      <a href="cookies.html">Política de cookies</a></p>
+      <p>Usamos cookies técnicas y, si aceptas, de analítica anónima. <a href="cookies.html">Más información</a></p>
       <div class="ck-btns">
+        <button type="button" class="ck-link2" data-ck="config">Configurar</button>
         <button type="button" class="ck-btn" data-ck="reject">Rechazar</button>
-        <button type="button" class="ck-btn" data-ck="config">Configurar</button>
         <button type="button" class="ck-btn" data-ck="accept">Aceptar</button>
       </div></div>`;
     document.body.appendChild(banner);

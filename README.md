@@ -24,6 +24,7 @@ de datos gratuita en Supabase.
 | `supabase/panel.sql` | Ranking de marcas (guardados) y correos bloqueados |
 | `supabase/mensajes.sql` | Mensajes entre las marcas y tú (chat interno) |
 | `supabase/fotos.sql` | Hasta 5 fotos por prenda |
+| `supabase/marcas-v25.sql` | Perfil de marca completo (ciudad, historia, Instagram, web, sellos, envío y devoluciones), logo y portada obligatorios y seguir marcas (v25) |
 | `supabase/solicitudes.sql` | Solicitudes de marcas: las marcas piden entrar y solo crean cuenta si las apruebas (v24.7) |
 | `og.png` | Imagen que sale al compartir un enlace de la web |
 | `aviso-legal.html`, `privacidad.html`, `cookies.html` | Páginas legales. Se rellenan solas con los datos de `legal` en `config.js` |
@@ -444,4 +445,19 @@ registran solas: rellenan el formulario de **Vende en FOUND**. Tú las ves en Cr
 3. Solo ese correo puede crear la cuenta de marca. La base de datos lo comprueba (no se puede saltar).
 Las solicitudes nuevas salen en «Para hoy» del Resumen y con un número en la pestaña.
 Si apagas la opción, cualquier marca vuelve a poder registrarse sola.
+
+## Versión 25 (11 nov 2026)
+- **Portada (Marcas)**: frase «Marcas que nunca habrías encontrado» y tres pasos (test, descubrir, comprar en su web).
+  Los textos se cambian en modo edición. Los filtros ya no están en Marcas: solo en el Feed y en Buscar.
+- **Filtros**: Prendas, **Talla** (nuevo; empieza con tu talla del test) y Precio máximo de 0 a 500 € (arriba del todo, sin límite).
+- **Cookies**: barra fina con Configurar, Rechazar y Aceptar.
+- **Tarjetas de marca**: debajo del nombre, su estilo (las etiquetas que más usan sus prendas), ciudad y rango de precios; arriba, sus sellos.
+- **Página de marca**: historia, web, Instagram, correo, envío/entrega/devoluciones, seguidores y botón **Seguir**.
+- **Panel de marca**: ciudad, Instagram, web, frase corta, historia, sellos y envío/entrega/devoluciones (se rellena una vez y sale en todas sus prendas).
+  **Logo y portada obligatorios**: sin ellos no se puede guardar el perfil ni publicar prendas nuevas (también lo comprueba la base de datos).
+- **Ficha de prenda**: botón «Comprar en la web de [marca]» con aviso de que sales de FOUND, bloque de envío y devoluciones,
+  WhatsApp y Copiar enlace (cada prenda tiene su enlace: `…/found/?p=ID`), y «También te puede gustar» siempre con 6 prendas.
+- **Test de estilo visible**: etiqueta «Encaja contigo · 88 %» en cada prenda; al entrar al Feed sin test, se propone hacerlo (una vez).
+- **Seguir marcas**: también sin cuenta (se guarda en el navegador y pasa a la cuenta al registrarse). Las seguidas salen en Favoritas
+  y sus prendas suben en el Feed. Cada marca ve sus seguidores en su panel.
 
