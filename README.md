@@ -24,6 +24,7 @@ de datos gratuita en Supabase.
 | `supabase/panel.sql` | Ranking de marcas (guardados) y correos bloqueados |
 | `supabase/mensajes.sql` | Mensajes entre las marcas y tú (chat interno) |
 | `supabase/fotos.sql` | Hasta 5 fotos por prenda |
+| `supabase/solicitudes.sql` | Solicitudes de marcas: las marcas piden entrar y solo crean cuenta si las apruebas (v24.7) |
 | `og.png` | Imagen que sale al compartir un enlace de la web |
 | `aviso-legal.html`, `privacidad.html`, `cookies.html` | Páginas legales. Se rellenan solas con los datos de `legal` en `config.js` |
 | `consent.js` | Aviso de cookies (Aceptar / Rechazar / Configurar) |
@@ -433,3 +434,14 @@ los pasos 3 a 9 en modo real (los enlaces y el secreto son distintos).
 (`client_reference_id`). Al pagar, Stripe avisa a `stripe-webhook`, que comprueba la firma y guarda
 el estado en la tabla `brand_billing`. Las renovaciones, los impagos (Stripe reintenta el cobro y
 mientras tanto la marca sigue visible) y las cancelaciones llegan por el mismo camino.
+
+## Solicitudes de marcas (v24.7)
+Con **Solo marcas aprobadas** encendido (Creador > Ajustes de la web, viene encendido), las marcas no se
+registran solas: rellenan el formulario de **Vende en FOUND**. Tú las ves en Creador > **Solicitudes**:
+1. Mira su Instagram o su web y pulsa **Aprobar** o **Rechazar**.
+2. Si apruebas, pulsa **Enviar invitación por correo**: se abre tu correo ya escrito, con el enlace
+   `…/#/alta-marca/su-correo` para que creen la cuenta.
+3. Solo ese correo puede crear la cuenta de marca. La base de datos lo comprueba (no se puede saltar).
+Las solicitudes nuevas salen en «Para hoy» del Resumen y con un número en la pestaña.
+Si apagas la opción, cualquier marca vuelve a poder registrarse sola.
+

@@ -419,6 +419,31 @@ function supabaseApi() {
       if (error) throw new Error(/blocked_emails|schema cache|Could not find/i.test(error.message || '') ? 'Para bloquear correos falta ejecutar supabase/panel.sql en Supabase.' : error.message);
     },
     async adminUnblock(email) { const { error } = await sb.from('blocked_emails').delete().eq('email', email); fail(error); },
+    // --- solicitudes de marcas (v24.7) ---
+    async submitApplication(f) {
+      const { error } = await sb.from('brand_applications').insert({ brand_name: f.brand_name, email: f.email, instagram: f.instagram || null, website: f.website || null, city: f.city || null, categories: f.categories || [], about: f.about || null });
+      if (!error) return;
+      const t = (error.message || '') + ' ' + (error.code || '');
+      if (/23505|duplicate/i.test(t)) throw new Error('FOUND_SOLICITUD_REPETIDA');
+      if (/FOUND_DEMASIADAS_SOLICITUDES/.test(t)) throw new Error('Ahora mismo hay muchas solicitudes. Prueba de nuevo en un rato.');
+      if (/brand_applications|schema cache|Could not find/i.test(t)) throw new Error('Las solicitudes aún no están activadas. Escríbenos y te ayudamos.');
+      throw new Error(error.message);
+    },
+    async brandSignupAllowed(email) {
+      const { data, error } = await sb.rpc('brand_signup_allowed', { p_email: email });
+      if (error) return true; // si la función no existe aún, no bloquear desde la web (la base de datos decide)
+      return !!data;
+    },
+    async adminApplications() {
+      const { data, error } = await sb.from('brand_applications').select('*').order('created_at', { ascending: false }).limit(300);
+      if (error) { if (/brand_applications|schema cache|does not exist|Could not find/i.test(error.message || '')) return { missing: true, list: [] }; throw new Error(error.message); }
+      return { list: data || [] };
+    },
+    async adminSetApplication(id, status) {
+      const { data, error } = await sb.from('brand_applications').update({ status, reviewed_at: status === 'pending' ? null : new Date().toISOString() }).eq('id', id).select('id');
+      fail(error); if (!data || !data.length) throw new Error('No tienes permiso para este cambio.');
+    },
+    async adminDeleteApplication(id) { const { error } = await sb.from('brand_applications').delete().eq('id', id); fail(error); },
     // --- moderación y denuncias ---
     async adminSetStatus(id, status, reason) {
       const { data, error } = await sb.from('products').update({ status, reject_reason: status === 'rejected' ? (reason || null) : null }).eq('id', id).select('id');
@@ -497,6 +522,7 @@ function demoApi() {
     onChange() {},
     async init() { const u = me(); return { user: userObj(u), profile: u ? { ...u } : null }; },
     async signUp({ email, role, brandName }) {
+      if (role === 'brand' && !(await this.brandSignupAllowed(email))) throw new Error('FOUND_MARCA_NO_APROBADA');
       if (db.users.some(u => u.email.toLowerCase() === email.toLowerCase())) throw new Error('Ya existe una cuenta con ese correo.');
       if ((db.blocked || []).some(x => x.email === email.toLowerCase().trim())) throw new Error('FOUND_EMAIL_BLOQUEADO');
       const u = { id: 'u' + Date.now(), email, role, brand_name: role === 'brand' ? brandName : null, brand_bio: '', contact_email: role === 'brand' ? email : '', styles: [], cats: [], budget: 150 };
@@ -534,6 +560,15 @@ function demoApi() {
     async adminBlocked() { return { list: (db.blocked || []).slice().reverse() }; },
     async adminBlock(email, reason) { db.blocked = (db.blocked || []).filter(x => x.email !== email.toLowerCase().trim()); db.blocked.push({ email: email.toLowerCase().trim(), reason: reason || '', created_at: new Date().toISOString() }); save(); },
     async adminUnblock(email) { db.blocked = (db.blocked || []).filter(x => x.email !== email); save(); },
+    async submitApplication(f) {
+      db.apps = db.apps || []; const email = f.email.toLowerCase().trim();
+      if (db.apps.some(a => a.email === email && a.status === 'pending')) throw new Error('FOUND_SOLICITUD_REPETIDA');
+      db.apps.push({ ...f, email, id: 'a' + Date.now(), status: 'pending', created_at: new Date().toISOString(), reviewed_at: null }); save();
+    },
+    async brandSignupAllowed(email) { return (db.settings && db.settings.brandApproval === false) || (db.apps || []).some(a => a.email === email.toLowerCase().trim() && a.status === 'approved'); },
+    async adminApplications() { return { list: (db.apps || []).slice().reverse() }; },
+    async adminSetApplication(id, status) { const a = (db.apps || []).find(x => x.id === id); if (a) { a.status = status; a.reviewed_at = status === 'pending' ? null : new Date().toISOString(); save(); } },
+    async adminDeleteApplication(id) { db.apps = (db.apps || []).filter(x => x.id !== id); save(); },
     async adminSetStatus(id, status, reason) { const p = db.products.find(x => x.id === id); p.status = status; p.reason = status === 'rejected' ? (reason || '') : ''; save(); },
     async reportProduct(pid, reason, details) {
       db.reports = db.reports || [];
@@ -846,6 +881,7 @@ async function refreshProducts() {
 }
 const findProduct = id => S.allProducts.find(x => x.id === id);
 const modOn = () => !(S.settings && S.settings.moderation === false);
+const approvalOn = () => !(S.settings && S.settings.brandApproval === false); // «Solo marcas aprobadas» (v24.7)
 const guestFavs = () => new Set(lsGet('found_guest_favs', []));
 async function afterAuth() {
   const { user, profile } = await api.init();
@@ -950,7 +986,7 @@ function renderFoot() {
   $('#foot').innerHTML = `<div class="wrap"><div class="cols">
     <div><a class="logo" href="#/marcas">${esc(C.appName.slice(0, -1))}<b>${esc(C.appName.slice(-1))}</b></a><p>${T('foot.text', C.tagline + '. Marcas independientes y prendas elegidas según tu estilo.')}</p></div>
     <div><h2 class="fh">Comprar</h2><ul><li><a href="#/marcas">Marcas</a></li><li><a href="#/feed">Feed</a></li><li><a href="#/explorar">Buscar prendas</a></li><li><a href="#/gustos">Test de estilo</a></li><li><a href="#/guardados">Favoritas</a></li></ul></div>
-    <div><h2 class="fh">Marcas</h2><ul><li><a href="#/vender">Vende en ${esc(C.appName)}</a></li>${isBrand() ? '<li><a href="#/panel">Mi panel</a></li>' : '<li><a href="#/vender">Crear cuenta de marca</a></li>'}</ul></div>
+    <div><h2 class="fh">Marcas</h2><ul><li><a href="#/vender">Vende en ${esc(C.appName)}</a></li>${isBrand() ? '<li><a href="#/panel">Mi panel</a></li>' : approvalOn() ? '<li><a href="#/vender" data-act="brandsignup">Solicitar entrar</a></li>' : '<li><a href="#/vender">Crear cuenta de marca</a></li>'}</ul></div>
     <div><h2 class="fh">${esc(C.appName)}</h2><ul><li><a href="#/vender">Cómo funciona</a></li><li data-install${canInstall() ? '' : ' hidden'}><button type="button" class="linkbtn foot-inst" data-act="install">Instalar la app</button></li>${contact}${ig}<li><a href="#/${S.user ? 'cuenta' : 'entrar'}">${S.user ? 'Mi cuenta' : 'Entrar'}</a></li></ul></div>
   </div><div class="legal"><span>© ${year} ${esc(C.appName)}</span><span>${T('foot.legal', 'La compra se realiza en la tienda de cada marca.')}</span>
     <nav class="legal-links" aria-label="Información legal"><a href="aviso-legal.html">Aviso legal</a><a href="privacidad.html">Privacidad</a><a href="cookies.html">Cookies</a><button type="button" class="linkbtn" data-ck="open">Configurar cookies</button></nav></div>
@@ -1102,6 +1138,62 @@ function brandTileHTML(b) {
 }
 
 /* --- Vende en FOUND --- */
+/* Solicitud para entrar como marca (v24.7). Con «Solo marcas aprobadas» encendido,
+   las marcas ya no se registran solas: piden entrar, el Creador las revisa y, si las aprueba,
+   pueden crear su cuenta con ese correo. */
+function applyFormHTML() {
+  return `<section class="section applysec" id="solicitud"><div class="wrap"><div class="applygrid">
+    <div class="applyintro"><span class="eyebrow">${T('apply.eyebrow', 'Solicitud')}</span>
+      <h2>${T('apply.title', 'Cuéntanos *quién eres*.')}</h2>
+      <p class="muted">${T('apply.text', 'Queremos que cada marca de ' + C.appName + ' sume. Revisamos cada solicitud a mano y te respondemos por correo en pocos días.')}</p>
+      <ul class="applylist"><li>${T('apply.l1', 'Marcas independientes con producto propio')}</li><li>${T('apply.l2', 'Buenas fotos de tus prendas')}</li><li>${T('apply.l3', 'Tienda online o forma clara de comprar')}</li></ul>
+      <p class="muted applyhave">¿Ya te hemos aprobado? <button type="button" class="linkbtn" data-act="brandsignupok">Crea tu cuenta de marca</button></p>
+    </div>
+    <form id="applyForm" class="card-box" novalidate>
+      <label class="field"><span>Nombre de la marca</span><input type="text" id="ap-name" maxlength="60" autocomplete="organization" required></label>
+      <label class="field"><span>Correo de contacto</span><input type="email" id="ap-email" maxlength="200" autocomplete="email" required><small class="muted">Con este correo crearás tu cuenta si te aprobamos.</small></label>
+      <div class="frow2">
+        <label class="field"><span>Instagram</span><input type="text" id="ap-ig" maxlength="200" placeholder="@tumarca" autocomplete="off"></label>
+        <label class="field"><span>Web o tienda online</span><input type="url" id="ap-web" maxlength="300" placeholder="https://" autocomplete="url"></label>
+      </div>
+      <label class="field"><span>Ciudad</span><input type="text" id="ap-city" maxlength="80" autocomplete="address-level2"></label>
+      <div class="field"><span>Qué vendes</span><div class="chips" role="group" aria-label="Qué vendes">${C.categories.map(c => `<button type="button" class="chip" data-act="apcat" data-v="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join('')}</div></div>
+      <label class="field"><span>¿Qué hace especial a tu marca?</span><textarea id="ap-about" maxlength="600" placeholder="Materiales, dónde se hace, a quién va dirigida…"></textarea></label>
+      <label class="check terms"><input type="checkbox" id="ap-terms" required> <span>He leído y acepto la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a>.</span></label>
+      ${honeypot()}
+      <p class="msg" id="apmsg" role="alert"></p>
+      <button class="btn block" type="submit" id="apsend">Enviar solicitud <span class="arr" aria-hidden="true">→</span></button>
+      <p class="fine">Usamos estos datos solo para revisar tu solicitud y responderte.</p>
+    </form></div></div></section>`;
+}
+async function onApplySubmit(e) {
+  e.preventDefault();
+  const f = e.target, m = $('#apmsg'), btn = $('#apsend'); m.className = 'msg';
+  const bad = t => { m.classList.add('err'); m.textContent = t; };
+  const name = $('#ap-name').value.trim(), email = $('#ap-email').value.trim().toLowerCase();
+  let ig = $('#ap-ig').value.trim(), web = $('#ap-web').value.trim();
+  const city = $('#ap-city').value.trim(), about = $('#ap-about').value.trim();
+  const categories = $$('#applyForm [data-act="apcat"][aria-pressed="true"]').map(b => b.dataset.v);
+  if (!name) return bad('Escribe el nombre de tu marca.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return bad('Escribe un correo válido, por ejemplo hola@tumarca.com.');
+  if (!ig && !web) return bad('Déjanos tu Instagram o tu web para poder ver tus prendas.');
+  if (web && !/^https?:\/\//i.test(web)) web = 'https://' + web;
+  if (web && !isUrl(web)) return bad('La dirección de la web no parece correcta.');
+  if (ig) { ig = ig.replace(/^https?:\/\/(www\.)?instagram\.com\//i, '').replace(/^@/, '').replace(/[/?#].*$/, ''); if (!/^[A-Za-z0-9._]{1,30}$/.test(ig)) return bad('Escribe tu usuario de Instagram, por ejemplo @tumarca.'); ig = '@' + ig; }
+  if (!$('#ap-terms').checked) return bad('Para enviar la solicitud tienes que aceptar la política de privacidad.');
+  const bot = looksLikeBot(f, 3000);
+  if (bot === 'bot') { f.outerHTML = applyThanks(email); return; }
+  if (bot === 'fast') return bad('Vas muy rápido. Espera un segundo y vuelve a pulsar.');
+  if (tooManyTries('apply', 3, 30)) return bad('Ya has enviado varias solicitudes. Espera un rato y vuelve a probar.');
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    await api.submitApplication({ brand_name: name, email, instagram: ig, website: web, city, categories, about });
+    f.outerHTML = applyThanks(email);
+  } catch (err) { bad(traduce(err.message)); btn.disabled = false; btn.innerHTML = 'Enviar solicitud <span class="arr" aria-hidden="true">→</span>'; }
+}
+const applyThanks = email => `<div class="card-box applyok" role="status"><b>¡Solicitud enviada!</b><p>Gracias. Revisaremos tu marca y te escribiremos a <b>${esc(email)}</b> en pocos días. Si te aprobamos, podrás crear tu cuenta de marca con ese correo.</p></div>`;
+document.addEventListener('submit', e => { if (e.target.id === 'applyForm') onApplySubmit(e); });
+
 VIEWS.vender = () => {
   view.innerHTML = `<div class="wrap">
     <section class="hero vhero">
@@ -1109,15 +1201,17 @@ VIEWS.vender = () => {
         <span class="eyebrow">${T('sell.eyebrow', 'Para marcas independientes')}</span>
         <h1>${T('sell.title', 'Tus prendas, ante quien las busca.')}</h1>
         <p class="lead">${T('sell.lead', 'En ' + C.appName + ' los compradores nos dicen su estilo antes de empezar. Tú etiquetas tus prendas y nosotros las enseñamos a las personas con las que encajan.')}</p>
-        <div class="ctas"><button class="btn" data-act="brandsignup">${isBrand() ? 'Ir a mi panel' : 'Crear cuenta de marca'} <span class="arr" aria-hidden="true">→</span></button></div>
-        <p class="cta-sub muted">${billingOn() ? 'Suscripción mensual · cancela cuando quieras' : 'Gratis · sin comisiones por venta'}</p>
+        <div class="ctas"><button class="btn" data-act="brandsignup">${isBrand() ? 'Ir a mi panel' : approvalOn() ? T('sell.apply', 'Solicitar entrar') : 'Crear cuenta de marca'} <span class="arr" aria-hidden="true">→</span></button></div>
+        <p class="cta-sub muted">${approvalOn() && !isBrand() ? T('sell.applysub', 'Revisamos cada marca a mano · gratis · sin comisiones por venta') : billingOn() ? 'Suscripción mensual · cancela cuando quieras' : 'Gratis · sin comisiones por venta'}</p>
       </div>
       ${S.products.length >= 3 ? `<div class="hpics" aria-hidden="true">${ranked(S.products).slice(0, 3).map(p => `<div class="hpic" style="background:${tileBg(p)}">${pic(p, '')}</div>`).join('')}</div>` : ''}
     </section></div>
+    ${approvalOn() && !isBrand() ? applyFormHTML() : ''}
     <section class="section tint"><div class="wrap">
       <div class="sec-head"><div><span class="eyebrow">${T('sell.how', 'Cómo funciona')}</span><h2>${T('sell.howtitle', 'Empezar te lleva *diez minutos*.')}</h2></div></div>
-      <div class="steps">
-        <div class="step"><h3>${T('sell.s1', 'Crea tu cuenta')}</h3><p>${billingOn() ? T('sell.s1tp', 'Regístrate como marca, confirma tu correo y activa la suscripción mensual con tarjeta.') : T('sell.s1t', 'Regístrate como marca, confirma tu correo y completa tu perfil: nombre, logo, portada y correo de contacto.')}</p></div>
+      <div class="steps${approvalOn() ? ' four' : ''}">
+        ${approvalOn() ? `<div class="step"><h3>${T('sell.s0', 'Solicita entrar')}</h3><p>${T('sell.s0t', 'Cuéntanos quién eres y enséñanos tu Instagram o tu tienda. Revisamos cada marca a mano y te respondemos por correo.')}</p></div>` : ''}
+        <div class="step"><h3>${T('sell.s1', 'Crea tu cuenta')}</h3><p>${approvalOn() && !billingOn() ? T('sell.s1ta', 'Cuando te aprobemos, crea tu cuenta de marca con ese mismo correo y completa tu perfil: nombre, logo, portada y correo de contacto.') : billingOn() ? T('sell.s1tp', 'Regístrate como marca, confirma tu correo y activa la suscripción mensual con tarjeta.') : T('sell.s1t', 'Regístrate como marca, confirma tu correo y completa tu perfil: nombre, logo, portada y correo de contacto.')}</p></div>
         <div class="step"><h3>${T('sell.s2', 'Sube tus prendas')}</h3><p>${T('sell.s2t', 'Foto, precio, categoría, etiquetas de estilo y el enlace a tu tienda online. Puedes editarlas cuando quieras.')}</p></div>
         <div class="step"><h3>${T('sell.s3', 'Recibe compradores')}</h3><p>${T('sell.s3t', 'Tus prendas aparecen a quien encajan. Desde tu panel ves cuántas veces se guarda cada una.')}</p></div>
       </div></div></section>
@@ -1143,7 +1237,8 @@ VIEWS.vender = () => {
         <details><summary>${T('faq.q4', '¿Puedo cambiar o retirar mis prendas?')}</summary><p>${T('faq.a4', 'Sí, en cualquier momento desde tu panel: editar, cambiar la foto o eliminar.')}</p></details>
         ${billingOn() ? `<details><summary>${T('faq.q6', '¿Qué pasa si cancelo?')}</summary><p>${T('faq.a6', 'Tu suscripción sigue activa hasta el final del mes ya pagado. Después tus prendas dejan de mostrarse, pero se quedan guardadas: si vuelves a suscribirte, reaparecen.')}</p></details>` : ''}
         <details><summary>${T('faq.q5', '¿Qué datos veo de mis prendas?')}</summary><p>${T('faq.a5', 'Cuántas veces abren cada prenda, cuántas personas pasan a tu tienda desde ' + C.appName + ' y cuántas la guardan, por semana, por mes o desde siempre.')}</p></details>
-      </div></div></section>`;
+      </div></div></section>`;  stampForm($('#applyForm'));
+  if (S.toApply) { S.toApply = false; const a = $('#solicitud'); if (a) setTimeout(() => a.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' }), 60); }
 };
 
 /* --- Orden del feed de Descubrir ---
@@ -1382,8 +1477,9 @@ VIEWS.entrar = () => {
     <div class="seg" role="group" aria-label="Acción"><button data-act="authmode" data-v="in" aria-pressed="${!up}">Entrar</button><button data-act="authmode" data-v="up" aria-pressed="${up}">Crear cuenta</button></div>
     <form id="authForm" class="card-box" novalidate>
       ${up ? `<div class="seg" role="group" aria-label="Tipo de cuenta"><button type="button" data-act="authrole" data-v="buyer" aria-pressed="${!brand}">Soy comprador</button><button type="button" data-act="authrole" data-v="brand" aria-pressed="${brand}">Soy una marca</button></div>` : ''}
+      ${up && brand && approvalOn() ? `<p class="applynote">Las cuentas de marca son solo para marcas aprobadas. Usa el mismo correo con el que enviaste tu solicitud. ¿Aún no la has enviado? <a href="#/vender" data-act="brandsignup">Solicita entrar</a></p>` : ''}
       ${up && brand ? '<label class="field"><span>Nombre de tu marca</span><input type="text" id="a-brand" maxlength="60" autocomplete="organization"></label>' : ''}
-      <label class="field"><span>Correo</span><input type="email" id="a-email" autocomplete="email" required></label>
+      <label class="field"><span>Correo</span><input type="email" id="a-email" autocomplete="email" required value="${esc(S.prefillEmail || '')}"></label>
       <label class="field"><span>Contraseña${up ? ' (mínimo 8 caracteres)' : ''}</span><input type="password" id="a-pw" autocomplete="${up ? 'new-password' : 'current-password'}" required></label>
       ${up ? '' : '<button type="button" class="linkbtn forgot" data-act="authmode" data-v="forgot">¿Has olvidado tu contraseña?</button>'}
       ${up ? `<label class="check terms"><input type="checkbox" id="a-terms" required> <span>He leído y acepto la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a> y el <a href="aviso-legal.html" target="_blank" rel="noopener">aviso legal</a>.</span></label>` : ''}
@@ -1415,6 +1511,10 @@ async function onAuthSubmit(e) {
   if (tooManyTries(up ? 'signup' : 'signin', up ? 4 : 8, 10)) { m.classList.add('err'); m.textContent = 'Demasiados intentos seguidos. Espera unos minutos y vuelve a probar.'; return; }
   if (turnstileOn() && !TS.token) { m.classList.add('err'); m.textContent = 'Espera a que se complete la comprobación de seguridad (el recuadro de arriba) y vuelve a pulsar.'; return; }
   btn.disabled = true; btn.textContent = 'Un momento…';
+  if (up && brand && approvalOn() && api.brandSignupAllowed && !(await api.brandSignupAllowed(email))) {
+    m.classList.add('err'); m.innerHTML = `Este correo aún no tiene una solicitud de marca aprobada. Usa el correo con el que la enviaste o <a href="#/vender" data-act="brandsignup">solicita entrar</a>.`;
+    btn.disabled = false; btn.textContent = 'Crear cuenta'; return;
+  }
   const captchaToken = TS.token || undefined;
   try {
     if (up) {
@@ -1503,6 +1603,8 @@ function traduce(msg) {
   if (/same.*(as|than).*old password|different from the old/i.test(t)) return 'La contraseña nueva tiene que ser distinta de la anterior.';
   if (/password should be at least|weak password/i.test(t)) return 'Esa contraseña es demasiado débil. Usa al menos 8 caracteres, mezclando letras y números.';
   if (/captcha/i.test(t)) return 'No se pudo completar la comprobación de seguridad. Recarga la página y vuelve a probar.';
+  if (/FOUND_MARCA_NO_APROBADA/.test(t)) return 'Este correo aún no tiene una solicitud de marca aprobada. Solicita entrar desde «Vende en ' + C.appName + '» o usa el mismo correo con el que la enviaste.';
+  if (/FOUND_SOLICITUD_REPETIDA/.test(t)) return 'Ya tenemos una solicitud pendiente con este correo. Te escribiremos en cuanto la revisemos.';
   if (/FOUND_EMAIL_BLOQUEADO|Database error saving new user/i.test(t)) return 'No se puede crear una cuenta con este correo. Si crees que es un error, escríbenos.';
   return t;
 }
@@ -1536,7 +1638,8 @@ VIEWS.admin = async () => {
   const nPend = S.allProducts.filter(p => p.status === 'pending').length;
   let nRep = 0; try { const rr = api.adminReports ? await api.adminReports() : null; nRep = rr && rr.list ? rr.list.length : 0; } catch {}
   const badge = n => n ? ` <span class="tabn">${n}</span>` : '';
-  const tabs = [['resumen', 'Resumen'], ['revisar', 'Por revisar' + badge(nPend)], ['denuncias', 'Denuncias' + badge(nRep)], ['mensajes', 'Mensajes' + badge(S.unread)], ['salud', 'Salud del catálogo'], ['ranking', 'Ranking de marcas'], ['visitas', 'Visitas'], ['ajustes', 'Ajustes de la web'], ['productos', 'Productos'], ['usuarios', 'Usuarios']];
+  let nApps = 0; try { const ra = await api.adminApplications(); S.apps = ra.list || []; nApps = S.apps.filter(x => x.status === 'pending').length; } catch {}
+  const tabs = [['resumen', 'Resumen'], ['solicitudes', 'Solicitudes' + `<span class="tabslot" data-apps>${badge(nApps)}</span>`], ['revisar', 'Por revisar' + badge(nPend)], ['denuncias', 'Denuncias' + badge(nRep)], ['mensajes', 'Mensajes' + badge(S.unread)], ['salud', 'Salud del catálogo'], ['ranking', 'Ranking de marcas'], ['visitas', 'Visitas'], ['ajustes', 'Ajustes de la web'], ['productos', 'Productos'], ['usuarios', 'Usuarios']];
   view.innerHTML = `<div class="wrap page has-tabbar"><div class="pagehead"><div><span class="eyebrow">Solo para ti</span><h1 style="margin-top:12px">Panel de creador</h1><p class="muted">Cambia ${esc(C.appName)} desde aquí, sin tocar código.</p></div></div>
     <div class="seg admtabs" role="group" aria-label="Secciones">${tabs.map(([k, l]) => `<button data-act="admintab" data-v="${k}" aria-pressed="${S.adminTab === k}">${l}</button>`).join('')}</div>
     <div id="adminbody"></div></div>`;
@@ -1607,6 +1710,7 @@ async function todayHTML() {
   await refreshProducts();
   const items = [];
   const pend = S.allProducts.filter(p => p.status === 'pending').length;
+  try { const ra = await api.adminApplications(); const na = (ra.list || []).filter(x => x.status === 'pending').length; if (na) items.push(['solicitudes', `${na} ${na === 1 ? 'marca ha pedido' : 'marcas han pedido'} entrar en ${esc(C.appName)}`, 'Ver solicitudes', true]); } catch {}
   if (pend) items.push(['revisar', `${pend} ${pend === 1 ? 'prenda espera' : 'prendas esperan'} tu revisión`, 'Revisar', true]);
   try { const r = await api.adminReports(); if (r.list && r.list.length) items.push(['denuncias', `${r.list.length} ${r.list.length === 1 ? 'denuncia pendiente' : 'denuncias pendientes'}`, 'Ver denuncias', true]); } catch {}
   let users = []; try { const r = await api.adminUsers(); users = r.list || []; } catch {}
@@ -1770,6 +1874,49 @@ async function saveAdminEdit(id, btn) {
 }
 
 /* ---------- Correos bloqueados ---------- */
+/* ---------- pestaña Solicitudes (v24.7) ---------- */
+const appLink = ap => (C.siteUrl || baseUrl()) + '#/alta-marca/' + encodeURIComponent(ap.email);
+function appMail(ap) {
+  const body = `Hola, equipo de ${ap.brand_name}:\n\nGracias por querer estar en ${C.appName}. Hemos visto vuestra marca y nos encanta: ¡estáis dentro!\n\nPara empezar, cread vuestra cuenta de marca con este mismo correo (${ap.email}) desde este enlace:\n${appLink(ap)}\n\nDespués, completad el perfil (logo, portada y correo de contacto) y subid vuestras prendas con buenas fotos, precio, tallas y el enlace a vuestra tienda. Cuanto mejor etiquetéis el estilo de cada prenda, mejor encajará con quien la busca.\n\nSi tenéis cualquier duda, responded a este correo.\n\nUn saludo,\nEl equipo de ${C.appName}`;
+  return { subject: `Bienvenidos a ${C.appName}: vuestra solicitud está aprobada`, body };
+}
+function appNoMail(ap) {
+  return { subject: `Vuestra solicitud en ${C.appName}`, body: `Hola, equipo de ${ap.brand_name}:\n\nGracias por vuestro interés en ${C.appName} y por el tiempo que habéis dedicado a la solicitud.\n\nDe momento no podemos incluir vuestra marca, pero seguimos creciendo y podéis volver a escribirnos más adelante.\n\nUn saludo,\nEl equipo de ${C.appName}` };
+}
+const mailHref = (to, m) => `mailto:${encodeURIComponent(to).replace('%40', '@')}?subject=${encodeURIComponent(m.subject)}&body=${encodeURIComponent(m.body)}`;
+function updateAppsBadge() {
+  const n = (S.apps || []).filter(x => x.status === 'pending').length;
+  $$('[data-apps]').forEach(el => { el.innerHTML = n ? ` <span class="tabn">${n}</span>` : ''; });
+}
+function appCard(ap) {
+  const igUser = (ap.instagram || '').replace(/^@/, '');
+  const has = S.appUsers && S.appUsers.has(String(ap.email).toLowerCase());
+  const st = { pending: ['Pendiente', 'pend'], approved: [has ? 'Aprobada · cuenta creada' : 'Aprobada · sin cuenta aún', 'ok'], rejected: ['Rechazada', 'no'] }[ap.status] || ['', ''];
+  const links = [igUser ? `<a href="https://instagram.com/${esc(encodeURIComponent(igUser))}" target="_blank" rel="noopener noreferrer">Instagram ${esc(ap.instagram)}</a>` : '', isUrl(ap.website) ? `<a href="${esc(ap.website)}" target="_blank" rel="noopener noreferrer">${esc(ap.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''))}</a>` : ''].filter(Boolean).join('');
+  const acts = ap.status === 'pending'
+    ? `<button class="btn small" data-act="appok" data-id="${esc(ap.id)}">Aprobar</button><button class="btn ghost small" data-act="appno" data-id="${esc(ap.id)}">Rechazar</button>`
+    : ap.status === 'approved'
+      ? `${has ? '' : `<a class="btn small" href="${esc(mailHref(ap.email, appMail(ap)))}">Enviar invitación por correo</a><button class="btn ghost small" data-act="appcopy" data-id="${esc(ap.id)}">Copiar mensaje</button>`}<button class="linkbtn" data-act="appundo" data-id="${esc(ap.id)}">Deshacer</button>`
+      : `<a class="btn ghost small" href="${esc(mailHref(ap.email, appNoMail(ap)))}">Responder por correo</a><button class="linkbtn" data-act="appundo" data-id="${esc(ap.id)}">Deshacer</button><button class="linkbtn danger" data-act="appdel" data-id="${esc(ap.id)}">Borrar</button>`;
+  return `<article class="card-box appcard${S.appOpen === ap.id ? ' flash' : ''}">
+    <div class="apphead"><div><h3>${esc(ap.brand_name)}</h3><small class="muted">${esc(ap.email)}${ap.city ? ' · ' + esc(ap.city) : ''} · ${fmtShort(ap.created_at)}</small></div><span class="appst ${st[1]}">${st[0]}</span></div>
+    ${links ? `<div class="applinks">${links}</div>` : ''}
+    ${(ap.categories || []).length ? `<div class="chips appcats">${ap.categories.map(c => `<span class="chip">${esc(c)}</span>`).join('')}</div>` : ''}
+    ${ap.about ? `<p class="appabout">${esc(ap.about)}</p>` : ''}
+    ${ap.status === 'approved' && !has ? '<p class="muted apphint">Paso siguiente: mándale la invitación. El correo se abre ya escrito, con el enlace para crear su cuenta.</p>' : ''}
+    <div class="acts">${acts}</div></article>`;
+}
+function renderApps() {
+  const box = $('#appsbox'); if (!box) return;
+  if (S.appsMissing) { box.innerHTML = '<section class="card-box" style="max-width:760px"><h2>Falta un paso</h2><p class="muted">Para recibir solicitudes de marcas, ejecuta <b>supabase/solicitudes.sql</b> en Supabase &gt; SQL Editor.</p></section>'; return; }
+  const list = S.apps || [], pend = list.filter(x => x.status === 'pending'), done = list.filter(x => x.status !== 'pending');
+  box.innerHTML = `<div class="appswrap">
+    <p class="muted appsintro">${approvalOn() ? `Las marcas piden entrar desde «Vende en ${esc(C.appName)}». Mira su Instagram o su web y decide. Si apruebas, mándale la invitación: solo con ese correo podrá crear su cuenta de marca.` : 'Ahora mismo cualquier marca puede registrarse sola. Para que solo entren las que apruebes, enciende «Solo marcas aprobadas» en Ajustes de la web.'}</p>
+    <h2 class="appsh">Por revisar <span class="muted">${pend.length}</span></h2>
+    ${pend.length ? pend.map(appCard).join('') : '<p class="muted appsempty">No hay solicitudes pendientes.</p>'}
+    ${done.length ? `<h2 class="appsh">Revisadas <span class="muted">${done.length}</span></h2>${done.map(appCard).join('')}` : ''}</div>`;
+}
+
 async function renderBlocked() {
   const box = $('#blockbox'); if (!box || !api.adminBlocked) return;
   let r; try { r = await api.adminBlocked(); } catch (e) { box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
@@ -1907,6 +2054,11 @@ async function renderAdminTab() {
         <p class="muted"><b>Ajustes de la web:</b> nombre, frase, color principal, aviso superior, estilos y categorías.<br>
         <b>Productos:</b> destacar los que quieras empujar o eliminar los que no deban estar.<br>
         <b>Usuarios:</b> ver quién se ha registrado y cambiar su tipo de cuenta.</p></section>`;
+    } else if (t === 'solicitudes') {
+      box.innerHTML = '<div id="appsbox"><p class="muted">Cargando…</p></div>';
+      try { const ra = await api.adminApplications(); S.apps = ra.list || []; S.appsMissing = !!ra.missing; } catch (e) { S.apps = []; box.innerHTML = `<p class="muted">${esc(e.message)}</p>`; return; }
+      try { const ru = await api.adminUsers(); S.appUsers = new Set((ru.list || []).filter(u => u.role === 'brand' && u.email).map(u => u.email.toLowerCase())); } catch { S.appUsers = new Set(); }
+      renderApps();
     } else if (t === 'mensajes') {
       await refreshProducts();
       await renderChatAdmin(box);
@@ -1959,6 +2111,8 @@ async function renderAdminTab() {
         <h3 style="margin:26px 0 6px">Revisión de prendas</h3>
         <label class="check"><input type="checkbox" id="s-mod"${modOn() ? ' checked' : ''}> <span>Revisar las prendas nuevas antes de publicarlas</span></label>
         <p class="muted" style="font-size:14px;margin:-8px 0 12px">Si lo apagas, las marcas publican al momento. Las denuncias siguen funcionando igual.</p>
+        <label class="check"><input type="checkbox" id="s-appr"${approvalOn() ? ' checked' : ''}> <span>Solo marcas aprobadas</span></label>
+        <p class="muted" style="font-size:14px;margin:-8px 0 12px">Las marcas piden entrar desde «Vende en ${esc(C.appName)}» y solo pueden crear su cuenta si apruebas su solicitud (en la pestaña Solicitudes). Si lo apagas, cualquier marca se registra sola.</p>
         <h3 style="margin:26px 0 6px">Cobro a las marcas (Stripe)</h3>
         <p class="muted" style="font-size:14px;margin-bottom:12px">Ahora mismo está ${billingOn() ? '<b>activado</b>: las marcas pagan una suscripción mensual para publicar.' : '<b>apagado</b>: las marcas publican gratis y no ven nada de pagos.'} Para activarlo más adelante sigue el README, apartado «Para más adelante: cobrar a las marcas».</p>
         <label class="check"><input type="checkbox" id="s-billon"${billingOn() ? ' checked' : ''}> <span>Cobrar una suscripción mensual a las marcas</span></label>
@@ -2002,7 +2156,7 @@ async function saveSiteSettings() {
   if (billing.portal && !/^https:\/\/billing\.stripe\.com\//.test(billing.portal)) return bad('El enlace del portal debe empezar por https://billing.stripe.com/.');
   if (billing.price !== '' && !(billing.price > 0)) return bad('El precio debe ser mayor que 0.');
   const prev = S.settings || {};
-  const full = { ...prev, ...v, billing, moderation: $('#s-mod') ? $('#s-mod').checked : modOn(), colors: { ...(prev.colors || {}), accent: v.accent } };
+  const full = { ...prev, ...v, billing, moderation: $('#s-mod') ? $('#s-mod').checked : modOn(), brandApproval: $('#s-appr') ? $('#s-appr').checked : approvalOn(), colors: { ...(prev.colors || {}), accent: v.accent } };
   try { await api.saveSettings(full); applySettings(full); renderNav(); m.classList.add('ok'); m.textContent = 'Guardado. Ya se ve en toda la web.'; }
   catch (e) { bad('No se pudo guardar: ' + e.message + (api.live ? ' (¿ejecutaste la última versión de schema.sql?)' : '')); }
 }
@@ -2653,7 +2807,30 @@ document.addEventListener('click', async e => {
     case 'demopay': if (api.demoPay) { await api.demoPay(S.user.id); await refreshBilling(); await refreshProducts(); toast('Pago simulado. Suscripción activa.'); go('pago'); } break;
     case 'checkpay': b.disabled = true; b.textContent = 'Comprobando…'; await refreshBilling(); if (subActive(S.billing)) { await refreshProducts(); toast('Suscripción activa. Ya puedes publicar.'); renderPanel(); } else { b.disabled = false; b.textContent = 'Ya he pagado'; toast('Aún no nos consta el pago. Si acabas de pagar, espera unos segundos.'); } break;
     case 'submanual': try { await api.adminSetManual(id, v === 'on'); toast(v === 'on' ? 'Marca activada sin pago' : 'Activación manual quitada'); renderAdminTab(); } catch (err) { toast(err.message); } break;
-    case 'brandsignup': if (isBrand()) go('panel'); else { S.authMode = 'up'; S.authRole = 'brand'; go('entrar'); } break;
+    case 'brandsignup':
+      if (isBrand()) go('panel');
+      else if (approvalOn() && !isAdmin()) { if (S.route === 'vender') { const a = $('#solicitud'); if (a) a.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' }); const n = $('#ap-name'); if (n) setTimeout(() => n.focus({ preventScroll: true }), reduceMotion ? 0 : 400); } else { S.toApply = true; go('vender'); } }
+      else { S.authMode = 'up'; S.authRole = 'brand'; go('entrar'); }
+      break;
+    case 'brandsignupok': S.authMode = 'up'; S.authRole = 'brand'; go('entrar'); break;
+    case 'apcat': b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true'); break;
+    case 'appok': case 'appno': case 'appundo': {
+      const st = a === 'appok' ? 'approved' : a === 'appno' ? 'rejected' : 'pending';
+      b.disabled = true;
+      try {
+        await api.adminSetApplication(id, st);
+        const ap = (S.apps || []).find(x => x.id === id);
+        if (ap) { ap.status = st; ap.reviewed_at = st === 'pending' ? null : new Date().toISOString(); }
+        toast(st === 'approved' ? 'Aprobada. Ahora mándale la invitación.' : st === 'rejected' ? 'Solicitud rechazada' : 'Solicitud de nuevo pendiente');
+        S.appOpen = st === 'pending' ? null : id;
+        renderApps(); updateAppsBadge();
+      } catch (err) { b.disabled = false; toast(err.message); }
+      break; }
+    case 'appcopy': { const ap = (S.apps || []).find(x => x.id === id); if (ap) copyText(appMail(ap).body, 'Mensaje copiado. Pégalo en tu correo.'); break; }
+    case 'appdel': {
+      if (!b.dataset.sure) { b.dataset.sure = '1'; b.textContent = '¿Seguro? Pulsa otra vez'; break; }
+      try { await api.adminDeleteApplication(id); S.apps = (S.apps || []).filter(x => x.id !== id); toast('Solicitud borrada'); renderApps(); updateAppsBadge(); } catch (err) { toast(err.message); }
+      break; }
     case 'rnav': { const r = $('#reel'); if (r) r.scrollBy({ top: (+v) * r.clientHeight, behavior: reduceMotion ? 'auto' : 'smooth' }); break; }
     case 'qs': tgl(S.draft.styles, v); b.setAttribute('aria-pressed', S.draft.styles.includes(v)); break;
     case 'qc': tgl(S.draft.cats, v); b.setAttribute('aria-pressed', S.draft.cats.includes(v)); break;
@@ -2940,6 +3117,8 @@ function route() {
   const h = /^#\//.test(location.hash) ? location.hash.slice(2) : '';
   let [name, arg] = (h || 'marcas').split('/');
   name = { inicio: 'marcas', feed: 'descubrir', favoritas: 'guardados' }[name] || name;
+  // enlace de la invitación a una marca aprobada: #/alta-marca/correo
+  if (name === 'alta-marca') { S.authMode = 'up'; S.authRole = 'brand'; S.prefillEmail = arg ? decodeURIComponent(arg) : ''; history.replaceState(null, '', location.pathname + location.search + '#/entrar'); name = 'entrar'; arg = undefined; }
   if (name !== 'entrar' && S.authMode === 'forgot') S.authMode = 'in';
   S.route = VIEWS[name] && name !== '404' ? name : (h ? '404' : 'marcas');
   document.body.classList.remove('noscroll');
