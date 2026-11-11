@@ -1251,7 +1251,6 @@ VIEWS.marcas = () => {
   view.innerHTML = `<div class="wrap page has-tabbar mhome">
     <section class="mintro">
       <h1>${T('dir.hero', 'Marcas que nunca habrías *encontrado*.')}</h1>
-      <p class="lead">${T('dir.lead', 'Pequeñas marcas que no salen en los anuncios ni en los grandes escaparates. Aquí las descubres según tu estilo y compras directamente en su web.')}</p>
       <ol class="msteps">${steps.map(([a, t, sub], i) => {
         const inner = `<span class="ms-n" aria-hidden="true">${i + 1}</span><span class="ms-t"><b>${t}</b><small>${sub}</small></span>`;
         return `<li>${a === 'gustos' ? `<button type="button" class="ms-in" data-act="gustos">${inner}<span class="arr" aria-hidden="true">→</span></button>` : a === 'feed' ? `<a class="ms-in" href="#/feed">${inner}<span class="arr" aria-hidden="true">→</span></a>` : `<span class="ms-in">${inner}</span>`}</li>`;
