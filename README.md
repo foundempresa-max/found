@@ -24,6 +24,7 @@ de datos gratuita en Supabase.
 | `supabase/panel.sql` | Ranking de marcas (guardados) y correos bloqueados |
 | `supabase/mensajes.sql` | Mensajes entre las marcas y tú (chat interno) |
 | `supabase/fotos.sql` | Hasta 5 fotos por prenda |
+| `supabase/mujer-hombre-v26.sql` | Para quién es cada prenda (mujer, hombre o unisex) y qué quiere ver cada comprador (v26) |
 | `supabase/marcas-v25.sql` | Perfil de marca completo (ciudad, historia, Instagram, web, sellos, envío y devoluciones), logo y portada obligatorios y seguir marcas (v25) |
 | `supabase/solicitudes.sql` | Solicitudes de marcas: las marcas piden entrar y solo crean cuenta si las apruebas (v24.7) |
 | `og.png` | Imagen que sale al compartir un enlace de la web |
@@ -460,4 +461,12 @@ Si apagas la opción, cualquier marca vuelve a poder registrarse sola.
 - **Test de estilo visible**: etiqueta «Encaja contigo · 88 %» en cada prenda; al entrar al Feed sin test, se propone hacerlo (una vez).
 - **Seguir marcas**: también sin cuenta (se guarda en el navegador y pasa a la cuenta al registrarse). Las seguidas salen en Favoritas
   y sus prendas suben en el Feed. Cada marca ve sus seguidores en su panel.
+
+## Versión 26 (11 nov 2026) · Todo, Mujer u Hombre
+- **Feed y Buscar**: interruptor «Todo · Mujer · Hombre» encima de los filtros (la opción activa en lima). Las prendas **unisex salen siempre**.
+  La elección se recuerda en el navegador y, con cuenta, en el perfil (`profiles.gender_pref`).
+- **Test de estilo**: nueva primera pregunta «¿Qué ropa quieres ver?» (Mujer, Hombre o Todo).
+- **Panel de marca**: campo obligatorio «Para quién es»: Mujer, Hombre o Unisex (`products.gender`). Las prendas que ya existían quedan como Unisex.
+- **Tarjetas de marca**: la línea empieza por para quién hace ropa («Mujer y hombre», «Mujer», «Hombre» o «Unisex»).
+- La ficha muestra la etiqueta Mujer/Hombre/Unisex y «También te puede gustar» respeta la elección.
 
