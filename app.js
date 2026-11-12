@@ -1145,12 +1145,30 @@ function renderFoot() {
    TARJETAS
    ========================================================== */
 // v25 · el test se nota: etiqueta en cada prenda con lo que encaja contigo
+/* ---------- Novedades (v27) ---------- */
+const NEW_DAYS = 14;
+const ageDays = p => p.created ? (Date.now() - new Date(p.created).getTime()) / 864e5 : 999;
+const isNew = p => ageDays(p) <= 7;
+// última visita: se guarda al salir de la portada, para contar lo nuevo desde entonces
+const LAST_SEEN = lsGet('found_last_seen', 0);
+const newSince = p => LAST_SEEN && p.created && new Date(p.created).getTime() > LAST_SEEN;
+function newsHTML() {
+  const list = S.products.filter(p => genOk(p) && ageDays(p) <= NEW_DAYS).sort((a, b) => String(b.created).localeCompare(String(a.created))).slice(0, 12);
+  if (list.length < 3) return '';
+  const fresh = S.products.filter(p => genOk(p) && newSince(p)).length;
+  return `<section class="news" aria-labelledby="news-h">
+    <div class="news-head"><div><h2 id="news-h">${T('news.title', 'Novedades')}</h2>
+      <p class="muted">${fresh ? `<b class="news-n">${fresh} ${fresh === 1 ? 'prenda nueva' : 'prendas nuevas'}</b> desde tu última visita` : T('news.sub', 'Lo último que han subido las marcas')}</p></div>
+      <a class="news-all" href="#/explorar" data-act="seenew">Ver todo <span aria-hidden="true">→</span></a></div>
+    <div class="news-row" role="list">${list.map(p => `<div class="news-it" role="listitem">${cardHTML(p)}</div>`).join('')}</div>
+  </section>`;
+}
 const fitTag = (m, cls = '') => m === null ? '' : `<span class="fit${m >= 70 ? ' hi' : ''}${cls ? ' ' + cls : ''}" title="Según tu test de estilo">${m >= 70 ? ICON.check : ''}${m >= 70 ? 'Encaja contigo' : 'Tu estilo'} · ${m} %</span>`;
 function cardHTML(p) {
   const m = matchPct(p), fav = S.favs.has(p.id);
   return `<article class="card">
     <button class="tile" data-act="open" data-id="${esc(p.id)}" aria-label="Ver ${esc(p.name)}" style="background:${tileBg(p)}">${pic(p, p.name)}${p.images[1] ? `<img class="alt" src="${esc(p.images[1])}" alt="" loading="lazy"><span class="nph" aria-hidden="true">${p.images.length} fotos</span>` : ''}</button>
-    ${fitTag(m, 'hang')}
+    ${fitTag(m, 'hang')}${isNew(p) ? `<span class="newtag${m === null ? '' : ' low'}">Nuevo</span>` : ''}
     <button class="heart" data-act="fav" data-id="${esc(p.id)}" aria-pressed="${fav}" aria-label="${fav ? 'Quitar de guardados' : 'Guardar'}: ${esc(p.name)}">${ICON.heart}</button>
     <div class="meta"><div class="p">${money(p.price)}</div><div class="n">${esc(p.name)}</div><div class="b">${[sizeLine(p), esc(p.brand)].filter(Boolean).join(' · ')}${p.featured ? ' · <b>Destacado</b>' : ''}</div></div>
   </article>`;
@@ -1281,6 +1299,7 @@ VIEWS.marcas = () => {
         return `<li>${a === 'gustos' ? `<button type="button" class="ms-in" data-act="gustos">${inner}<span class="arr" aria-hidden="true">→</span></button>` : a === 'feed' ? `<a class="ms-in" href="#/feed">${inner}<span class="arr" aria-hidden="true">→</span></a>` : `<span class="ms-in">${inner}</span>`}</li>`;
       }).join('')}</ol>
     </section>
+    ${newsHTML()}
     <div class="mhead"><h2>${T('dir.title', 'Marcas')}</h2>${brands.length ? `<span class="muted">${brands.length} ${brands.length === 1 ? 'marca' : 'marcas'}</span>` : ''}</div>
     <div class="mgrid">${brands.length ? brands.map(brandTileHTML).join('') : '<div class="empty">Aún no hay marcas con prendas publicadas.<br><a class="btn" href="#/vender">Sé la primera</a></div>'}</div>
     ${isBrand() ? '' : `<div class="hband" style="margin-top:28px"><div><b>${T('band.title', '¿Tienes una marca? Publica en ' + C.appName + '.')}</b><span>${T('band.text', 'Los compradores con tu estilo te encuentran. La venta se hace en tu propia tienda.')}</span></div><a class="bandlink" href="#/vender">${T('band.cta2', 'Saber más')} <span aria-hidden="true">→</span></a></div>`}
@@ -1471,7 +1490,7 @@ VIEWS.descubrir = () => {
         <a href="#/marca/${esc(p.brand_id)}" class="dbrand">${miniLogo(p.logo)}${esc(p.brand)}</a>
         <div class="n">${esc(p.name)}</div>
         <div class="p">${money(p.price)}</div>
-        ${m !== null ? `<div class="fitrow">${fitTag(m)}</div>` : ''}
+        ${m !== null || isNew(p) ? `<div class="fitrow">${isNew(p) ? '<span class="newtag inl">Nuevo</span>' : ''}${fitTag(m)}</div>` : ''}
         <div class="chips">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
         ${p.sizes.length ? `<div class="szline"><span class="szlbl">${fitsMe(p) ? 'Hay tu talla' : 'Tallas'}</span>${sizeChips(p)}</div>` : ''}
       </div>
@@ -2515,6 +2534,8 @@ function startChatWatch() {
   if (api.chatSubscribe) api.chatSubscribe(onChatPing);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && chatTimer) onChatPing(); });
+// v27 · al irse, se apunta la hora para contar las novedades de la próxima visita
+window.addEventListener('pagehide', () => lsSet('found_last_seen', Date.now()));
 // en el panel de la marca: aviso de mensajes nuevos
 const panelMsgsHTML = () => S.unread
   ? `<a class="msgalert" href="#/mensajes"><b>${S.unread === 1 ? 'Tienes 1 mensaje nuevo' : `Tienes ${S.unread} mensajes nuevos`} de ${esc(C.appName)}</b><span>Leer y contestar →</span></a>`
@@ -3027,6 +3048,7 @@ document.addEventListener('click', async e => {
     case 'galto': galGo(+v, true); break;
     case 'fav': toggleFav(id); break;
     case 'cats': openCats(v); break;
+    case 'seenew': S.sort = 'new'; break;
     case 'see': {
       S.see = normSee(v); lsSet('found_see', S.see);
       if (S.user) { try { await api.saveProfile(S.user.id, { gender_pref: S.see }); S.profile = { ...S.profile, gender_pref: S.see }; } catch {} }

@@ -470,3 +470,10 @@ Si apagas la opción, cualquier marca vuelve a poder registrarse sola.
 - **Tarjetas de marca**: la línea empieza por para quién hace ropa («Mujer y hombre», «Mujer», «Hombre» o «Unisex»).
 - La ficha muestra la etiqueta Mujer/Hombre/Unisex y «También te puede gustar» respeta la elección.
 
+## Versión 27 (12 nov 2026) · Novedades
+- **Portada**: fila «Novedades» entre los tres pasos y las marcas, con las prendas de las últimas 2 semanas (hasta 12, la más nueva primero),
+  respetando Todo/Mujer/Hombre. Se desliza de lado. Si hay menos de 3 prendas recientes, no aparece.
+- Dice cuántas prendas son nuevas **desde tu última visita** (se guarda en el navegador al salir); la primera vez: «Lo último que han subido las marcas».
+- Etiqueta **«Nuevo»** en las prendas de menos de 7 días: en las tarjetas (portada, Buscar, Favoritas, página de marca) y en el Feed.
+- «Ver todo →» abre Buscar ordenado por Novedades. Los textos se cambian en modo edición.
+
