@@ -4,6 +4,22 @@
      fotos y favoritos reales en tu base de datos.
    - Sin configurar: MODO DEMO (datos solo en este navegador).
    ========================================================== */
+/* --- vista previa del diseño nuevo: se activa con ?diseno=nuevo y se quita con ?diseno=actual (solo en este navegador) --- */
+(() => {
+  try {
+    const q = new URLSearchParams(location.search).get('diseno');
+    if (q === 'nuevo') sessionStorage.setItem('found_diseno', 'nuevo');
+    if (q === 'actual') sessionStorage.removeItem('found_diseno');
+    if (sessionStorage.getItem('found_diseno') !== 'nuevo') return;
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'diseno-nuevo.css?v=1';
+    document.head.appendChild(l);
+    document.documentElement.dataset.diseno = 'nuevo';
+    const b = document.createElement('div'); b.className = 'dn-badge'; b.setAttribute('role', 'status');
+    b.innerHTML = 'Vista previa: diseño nuevo <a href="?diseno=actual">Ver el actual</a>';
+    const put = () => document.body.appendChild(b);
+    document.body ? put() : document.addEventListener('DOMContentLoaded', put);
+  } catch {}
+})();
 (() => {
 'use strict';
 const C = window.FOUND_CONFIG;
