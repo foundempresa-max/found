@@ -2928,7 +2928,7 @@ dlg.addEventListener('close', () => { if (S.route) routeMeta(S.route, (location.
 /* ---------- denunciar una prenda ---------- */
 function openReportForm(id) {
   const box = $('#repbox'); if (!box) return;
-  box.innerHTML = `<form class="repform" onsubmit="return false"><b>¿Qué pasa con esta prenda?</b>
+  box.innerHTML = `<form class="repform"><b>¿Qué pasa con esta prenda?</b>
     ${Object.entries(REPORT_REASONS).map(([k, l], i) => `<label class="rrow"><input type="radio" name="rreason" value="${k}"${i === 0 ? ' checked' : ''}> <span>${esc(l)}</span></label>`).join('')}
     <label class="field" style="margin:8px 0 10px"><span>Cuéntanos algo más (opcional)</span><textarea id="rdetails" maxlength="500" placeholder="Ej. Es una copia de la marca X"></textarea></label>
     ${honeypot()}
@@ -2936,6 +2936,7 @@ function openReportForm(id) {
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" data-act="sendreport" data-id="${esc(id)}">Enviar aviso</button><button type="button" class="btn ghost small" data-act="open" data-id="${esc(id)}">Cancelar</button></div>
     <small class="muted">Lo revisamos y, si incumple las normas, la retiramos. No le decimos a la marca quién ha avisado.</small></form>`;
   stampForm(box.querySelector('form'));
+  box.querySelector('form').addEventListener('submit', e => e.preventDefault());
   box.querySelector('input').focus();
 }
 async function sendReport(id, btn) {

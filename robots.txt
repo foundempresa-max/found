@@ -2,6 +2,5 @@
 # Si conectas un dominio propio, cámbialo en la línea Sitemap.
 User-agent: *
 Allow: /
-Disallow: /supabase/
 
 Sitemap: https://foundempresa-max.github.io/found/sitemap.xml

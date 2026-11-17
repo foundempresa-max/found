@@ -23,8 +23,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      # Solo se publica la web. Los SQL de Supabase, el README y la configuración
+      # de GitHub se quedan en el repositorio y no salen en la dirección pública.
+      - name: Preparar solo los archivos públicos
+        run: |
+          mkdir _site
+          rsync -a --exclude='.git' --exclude='.github' --exclude='supabase' \
+            --exclude='README.md' --exclude='_site' --exclude='*.sql' --exclude='*.ts' \
+            --exclude='.env*' --exclude='*.zip' ./ _site/
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4

@@ -1,0 +1,10 @@
+# Nunca subir claves ni copias
+.env
+.env.*
+*.pem
+*.key
+service-role*
+*.zip
+_site/
+node_modules/
+.DS_Store

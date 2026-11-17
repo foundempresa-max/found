@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <!-- Fuerza HTTPS: si alguien entra por http:// le pasamos a https:// (además activa «Enforce HTTPS» en GitHub > Settings > Pages) -->
 <script>if (location.protocol === 'http:' && !/^(localhost|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname)) location.replace('https:' + location.href.slice(5));</script>
-<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-6ZXbnDRj+wbCoBawWFlrYbFvWbT22NOBZ+J5SdNYhC8=' https://www.googletagmanager.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://jysxlckreelzsvhroezz.supabase.co https://*.google-analytics.com https://www.googletagmanager.com; font-src 'self'; connect-src 'self' https://jysxlckreelzsvhroezz.supabase.co wss://jysxlckreelzsvhroezz.supabase.co https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>FOUND · Marketplace de moda independiente que encaja con tu estilo</title>
 <meta name="description" content="Descubre prendas de marcas independientes elegidas según tu estilo y tu talla. Haz el test de estilo en un minuto y compra directamente en la tienda de cada marca.">
@@ -102,10 +103,10 @@
 <dialog id="dlg" aria-label="Detalle del producto"></dialog>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="vendor/supabase.js" defer></script>
+<script src="vendor/supabase.js?v=28" defer></script>
 <script src="config.js?v=22" defer></script>
 <script src="consent.js?v=25" defer></script>
-<script src="app.js?v=27" defer></script>
+<script src="app.js?v=28" defer></script>
 <script src="motion.js?v=22" defer></script>
 </body>
 </html>
