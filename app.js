@@ -11,12 +11,12 @@
     if (q === 'nuevo') sessionStorage.setItem('found_diseno', 'nuevo');
     if (q === 'actual') sessionStorage.removeItem('found_diseno');
     if (sessionStorage.getItem('found_diseno') !== 'nuevo') return;
-    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'diseno-nuevo.css?v=3';
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'diseno-nuevo.css?v=4';
     document.head.appendChild(l);
     document.documentElement.dataset.diseno = 'nuevo';
     const b = document.createElement('div'); b.className = 'dn-badge'; b.setAttribute('role', 'status');
     b.innerHTML = 'Vista previa: diseño nuevo <a href="?diseno=actual">Ver el actual</a>';
-    const put = () => document.body.appendChild(b);
+    const put = () => document.body.prepend(b);
     document.body ? put() : document.addEventListener('DOMContentLoaded', put);
   } catch {}
 })();

@@ -106,12 +106,10 @@ html[data-diseno="nuevo"] .hband b{font-family:var(--serif);font-weight:400;font
 html[data-diseno="nuevo"] .hband span{font-size:16px;opacity:.78;margin-top:8px}
 
 /* ---------- aviso de vista previa ---------- */
-.dn-badge{position:fixed;z-index:60;left:50%;top:calc(var(--top-h,64px) + var(--ann-h,0px) + 10px + env(safe-area-inset-top,0px));transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:8px 8px 8px 16px;border-radius:999px;background:#151513;color:#F5F3EE;font:600 13px/1 'Hanken Grotesk',system-ui,sans-serif;box-shadow:0 10px 30px -10px rgba(0,0,0,.45);white-space:nowrap;animation:dn-in 260ms cubic-bezier(.23,1,.32,1) both}
-.dn-badge a{color:#151513;background:#DDF08A;text-decoration:none;padding:7px 12px;border-radius:999px;transition:transform 140ms cubic-bezier(.23,1,.32,1)}
+.dn-badge{display:flex;align-items:center;justify-content:center;gap:12px;padding:7px 12px;background:#151513;color:#F5F3EE;font:600 12.5px/1.2 'Hanken Grotesk',system-ui,sans-serif;letter-spacing:.01em}
+.dn-badge a{color:#151513;background:#DDF08A;text-decoration:none;padding:5px 11px;border-radius:999px;white-space:nowrap;transition:transform 140ms cubic-bezier(.23,1,.32,1)}
 .dn-badge a:active{transform:scale(.96)}
-@keyframes dn-in{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
 
 @media (prefers-reduced-motion:reduce){
   html[data-diseno="nuevo"] *{transition-duration:0ms!important}
-  .dn-badge{animation:none}
 }
