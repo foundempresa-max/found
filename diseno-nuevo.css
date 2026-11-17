@@ -105,6 +105,11 @@ html[data-diseno="nuevo"] .hband{border-radius:2px;padding:clamp(32px,5vw,72px);
 html[data-diseno="nuevo"] .hband b{font-family:var(--serif);font-weight:400;font-size:clamp(32px,4vw,56px);line-height:1;letter-spacing:-.02em}
 html[data-diseno="nuevo"] .hband span{font-size:16px;opacity:.78;margin-top:8px}
 
+/* ---------- pie y buscador ---------- */
+html[data-diseno="nuevo"] .foot{background:var(--bg);border-top:var(--hair)}
+html[data-diseno="nuevo"] .fword{font-family:var(--serif)!important;font-weight:400!important;letter-spacing:-.03em!important}
+html[data-diseno="nuevo"] .hsearch{background:color-mix(in srgb,var(--ink) 5%,transparent);border-color:transparent}
+
 /* ---------- aviso de vista previa ---------- */
 .dn-badge{display:flex;align-items:center;justify-content:center;gap:12px;padding:7px 12px;background:#151513;color:#F5F3EE;font:600 12.5px/1.2 'Hanken Grotesk',system-ui,sans-serif;letter-spacing:.01em}
 .dn-badge a{color:#151513;background:#DDF08A;text-decoration:none;padding:5px 11px;border-radius:999px;white-space:nowrap;transition:transform 140ms cubic-bezier(.23,1,.32,1)}
