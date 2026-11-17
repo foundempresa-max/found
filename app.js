@@ -345,7 +345,7 @@ function supabaseApi() {
     live: true,
     onChange(cb) { sb.auth.onAuthStateChange((ev) => { if (ev === 'PASSWORD_RECOVERY') { S.recovery = true; setTimeout(() => go('nueva-clave'), 0); } if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') cb(); }); },
     // recuperar contraseña: Supabase envía un enlace que vuelve a la web con una sesión temporal
-    async resetPassword(email) { const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: SITE_URL }); fail(error); },
+    async resetPassword(email, captchaToken) { const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: SITE_URL, ...(captchaToken ? { captchaToken } : {}) }); fail(error); },
     async updatePassword(password) { const { error } = await sb.auth.updateUser({ password }); fail(error); },
     async init() {
       const { data } = await sb.auth.getSession();
@@ -1752,6 +1752,7 @@ function forgotView() {
     <p class="muted" style="margin:0 0 20px">Escribe el correo con el que te registraste y te enviaremos un enlace para poner una contraseña nueva.</p>
     <form id="forgotForm" class="card-box" novalidate>
       <label class="field"><span>Correo</span><input type="email" id="f-email" autocomplete="email" required value="${esc(S.forgotEmail || '')}"></label>
+      ${turnstileOn() ? '<div class="ts-box" id="ts-box-f"></div>' : ''}
       <p class="msg" id="fmsg" role="alert"></p>
       <button class="btn block" type="submit" id="fsend">Enviarme el enlace</button>
       <button type="button" class="linkbtn" data-act="authmode" data-v="in" style="margin-top:14px">← Volver a entrar</button>
@@ -1760,14 +1761,16 @@ function forgotView() {
     e.preventDefault();
     const m = $('#fmsg'), btn = $('#fsend'), email = $('#f-email').value.trim(); m.className = 'msg';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { m.classList.add('err'); m.textContent = 'Escribe un correo válido, por ejemplo tu@correo.com.'; return; }
+    if (turnstileOn() && !TS.token) { m.classList.add('err'); m.textContent = 'Espera a que se complete la comprobación de seguridad (el recuadro de arriba) y vuelve a pulsar.'; return; }
     btn.disabled = true; btn.textContent = 'Enviando…'; S.forgotEmail = email;
     try {
-      await api.resetPassword(email);
+      await api.resetPassword(email, TS.token || undefined);
       // mismo mensaje exista o no la cuenta, para no revelar qué correos están registrados
       m.classList.add('ok'); m.textContent = 'Si hay una cuenta con ese correo, te llegará un enlace en unos minutos. Mira también en spam.';
       btn.textContent = 'Enlace enviado';
-    } catch (err) { m.classList.add('err'); m.textContent = traduce(err.message); btn.disabled = false; btn.textContent = 'Enviarme el enlace'; }
+    } catch (err) { m.classList.add('err'); m.textContent = traduce(err.message); btn.disabled = false; btn.textContent = 'Enviarme el enlace'; resetTurnstile(); }
   });
+  if (turnstileOn()) mountTurnstile('ts-box-f');
 }
 VIEWS['nueva-clave'] = () => {
   if (!S.user) {

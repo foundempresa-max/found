@@ -45,7 +45,7 @@ window.FOUND_CONFIG = {
 
   // --- Protección antispam con Cloudflare Turnstile (opcional, gratis). Mira el README, apartado 2q.
   //     Vacío = solo la protección básica (campo trampa y tiempo mínimo), que ya funciona sin hacer nada.
-  turnstileSiteKey: '',
+  turnstileSiteKey: '0x4AAAAAAGFXYuGBQB2jjr_s',   // clave PÚBLICA de Cloudflare Turnstile (widget «FOUND web»). La secreta va solo en Supabase.
 
   // --- Contenido editable
   styles: ['Minimalista', 'Streetwear', 'Vintage', 'Elegante', 'Deportivo', 'Bohemio', 'Sostenible'],
