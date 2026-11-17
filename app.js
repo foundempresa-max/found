@@ -1683,7 +1683,7 @@ VIEWS.entrar = () => {
       ${up && brand && approvalOn() ? `<p class="applynote">Las cuentas de marca son solo para marcas aprobadas. Usa el mismo correo con el que enviaste tu solicitud. ¿Aún no la has enviado? <a href="#/vender" data-act="brandsignup">Solicita entrar</a></p>` : ''}
       ${up && brand ? '<label class="field"><span>Nombre de tu marca</span><input type="text" id="a-brand" maxlength="60" autocomplete="organization"></label>' : ''}
       <label class="field"><span>Correo</span><input type="email" id="a-email" autocomplete="email" required value="${esc(S.prefillEmail || '')}"></label>
-      <label class="field"><span>Contraseña${up ? ' (mínimo 8 caracteres)' : ''}</span><input type="password" id="a-pw" autocomplete="${up ? 'new-password' : 'current-password'}" required></label>
+      <label class="field"><span>Contraseña${up ? ' (mínimo 8 caracteres, con letras y números)' : ''}</span><input type="password" id="a-pw" autocomplete="${up ? 'new-password' : 'current-password'}" required></label>
       ${up ? '' : '<button type="button" class="linkbtn forgot" data-act="authmode" data-v="forgot">¿Has olvidado tu contraseña?</button>'}
       ${up ? `<label class="check terms"><input type="checkbox" id="a-terms" required> <span>He leído y acepto la <a href="privacidad.html" target="_blank" rel="noopener">política de privacidad</a> y el <a href="aviso-legal.html" target="_blank" rel="noopener">aviso legal</a>.</span></label>` : ''}
       ${honeypot()}
@@ -1705,6 +1705,7 @@ async function onAuthSubmit(e) {
   const brandName = up && brand ? $('#a-brand').value.trim() : '';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { m.classList.add('err'); m.textContent = 'Escribe un correo válido, por ejemplo tu@correo.com.'; return; }
   if (up && pw.length < 8) { m.classList.add('err'); m.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+  if (up && !(/[A-Za-zÀ-ÿ]/.test(pw) && /\d/.test(pw))) { m.classList.add('err'); m.textContent = 'La contraseña debe tener letras y números.'; return; }
   if (pw.length < 6 && api.live) { m.classList.add('err'); m.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
   if (up && brand && !brandName) { m.classList.add('err'); m.textContent = 'Escribe el nombre de tu marca.'; return; }
   if (up && !$('#a-terms').checked) { m.classList.add('err'); m.textContent = 'Para crear la cuenta tienes que aceptar la política de privacidad.'; return; }
@@ -1779,7 +1780,7 @@ VIEWS['nueva-clave'] = () => {
     <h1 style="margin-bottom:10px;font-size:clamp(32px,4vw,44px)">${S.recovery ? 'Pon tu contraseña nueva' : 'Cambiar contraseña'}</h1>
     <p class="muted" style="margin:0 0 20px">Cuenta: <b>${esc(S.user.email)}</b></p>
     <form id="pwForm" class="card-box" novalidate>
-      <label class="field"><span>Contraseña nueva (mínimo 8 caracteres)</span><input type="password" id="n-pw" autocomplete="new-password" required></label>
+      <label class="field"><span>Contraseña nueva (mínimo 8 caracteres, con letras y números)</span><input type="password" id="n-pw" autocomplete="new-password" required></label>
       <label class="field"><span>Repítela</span><input type="password" id="n-pw2" autocomplete="new-password" required></label>
       <p class="msg" id="nmsg" role="alert"></p>
       <button class="btn block" type="submit" id="nsend">Guardar contraseña</button>
@@ -1788,6 +1789,7 @@ VIEWS['nueva-clave'] = () => {
     e.preventDefault();
     const m = $('#nmsg'), btn = $('#nsend'), a = $('#n-pw').value, b = $('#n-pw2').value; m.className = 'msg';
     if (a.length < 8) { m.classList.add('err'); m.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+    if (!(/[A-Za-zÀ-ÿ]/.test(a) && /\d/.test(a))) { m.classList.add('err'); m.textContent = 'La contraseña debe tener letras y números.'; return; }
     if (a !== b) { m.classList.add('err'); m.textContent = 'Las dos contraseñas no coinciden.'; return; }
     btn.disabled = true; btn.textContent = 'Guardando…';
     try {
@@ -1804,7 +1806,7 @@ function traduce(msg) {
   if (/email not confirmed/i.test(t)) return 'Aún no has confirmado tu correo. Revisa tu bandeja de entrada.';
   if (/rate limit|only request this after/i.test(t)) return 'Demasiados intentos. Espera un minuto y vuelve a probar.';
   if (/same.*(as|than).*old password|different from the old/i.test(t)) return 'La contraseña nueva tiene que ser distinta de la anterior.';
-  if (/password should be at least|weak password/i.test(t)) return 'Esa contraseña es demasiado débil. Usa al menos 8 caracteres, mezclando letras y números.';
+  if (/password should|weak.?password/i.test(t)) return 'Esa contraseña es demasiado débil. Usa al menos 8 caracteres, mezclando letras y números.';
   if (/captcha/i.test(t)) return 'No se pudo completar la comprobación de seguridad. Recarga la página y vuelve a probar.';
   if (/FOUND_MARCA_NO_APROBADA/.test(t)) return 'Este correo aún no tiene una solicitud de marca aprobada. Solicita entrar desde «Vende en ' + C.appName + '» o usa el mismo correo con el que la enviaste.';
   if (/FOUND_SOLICITUD_REPETIDA/.test(t)) return 'Ya tenemos una solicitud pendiente con este correo. Te escribiremos en cuanto la revisemos.';
