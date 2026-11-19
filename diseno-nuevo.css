@@ -162,7 +162,7 @@ html[data-diseno="nuevo"] .card .heart:active{transform:scale(.9)}
   html[data-diseno="nuevo"] .meta .p{font-size:14px}
 }
 @media (max-width:820px){
-  html[data-diseno="nuevo"] .brandhero>.avatar.lg{justify-self:start;width:72px}
+  html[data-diseno="nuevo"] .brandhero>.avatar.lg{justify-self:start;width:72px;margin:0}
 }
 
 /* ---------- ficha de prenda ---------- */

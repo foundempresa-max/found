@@ -11,7 +11,7 @@
     if (q === 'nuevo') sessionStorage.setItem('found_diseno', 'nuevo');
     if (q === 'actual') sessionStorage.removeItem('found_diseno');
     if (sessionStorage.getItem('found_diseno') !== 'nuevo') return;
-    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'diseno-nuevo.css?v=8';
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'diseno-nuevo.css?v=9';
     document.head.appendChild(l);
     document.documentElement.dataset.diseno = 'nuevo';
     const b = document.createElement('div'); b.className = 'dn-badge'; b.setAttribute('role', 'status');
