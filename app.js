@@ -178,6 +178,7 @@ function art(p, full) {
 }
 const pic = (p, alt) => p.image ? `<img src="${esc(p.image)}" alt="${esc(alt === undefined ? `${p.name} de ${p.brand}` : alt)}" loading="lazy" decoding="async">` : art(p);
 const ICON = {
+  sliders:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>',
   globe:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>',
   ig:'<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.2 6.8v.1"/></svg>',
   mail:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="M4 7l8 6 8-6"/></svg>',
@@ -1507,25 +1508,24 @@ VIEWS.descubrir = () => {
         <div class="n">${esc(p.name)}</div>
         <div class="p">${money(p.price)}</div>
         ${m !== null || isNew(p) ? `<div class="fitrow">${isNew(p) ? '<span class="newtag inl">Nuevo</span>' : ''}${fitTag(m)}</div>` : ''}
-        <div class="chips">${p.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>
-        ${p.sizes.length ? `<div class="szline"><span class="szlbl">${fitsMe(p) ? 'Hay tu talla' : 'Tallas'}</span>${sizeChips(p)}</div>` : ''}
       </div>
       <div class="rail">
         <div><button data-act="fav" data-id="${esc(p.id)}" aria-pressed="${fav}" aria-label="${fav ? 'Quitar de guardados' : 'Guardar'}: ${esc(p.name)}">${ICON.heart}</button><small>Guardar</small></div>
         <div><button data-act="open" data-id="${esc(p.id)}" aria-label="Ver detalles de ${esc(p.name)}">${ICON.info}</button><small>Detalles</small></div>
-        <div><button data-act="share" data-v="p" data-id="${esc(p.id)}" aria-label="Compartir ${esc(p.name)}">${ICON.share}</button><small>Compartir</small></div>
         <div>${buy}<small>Comprar</small></div>
       </div></section>`;
   }).join('');
   const empty = `<section class="slide" style="background:var(--soft)"><div class="empty" style="margin:20px;background:var(--surface);grid-column:auto">${S.products.length ? 'No hay prendas con estos filtros.<br><button class="btn small" data-act="fclear">Quitar filtros</button>' : 'Aún no hay productos. Si eres una marca, sube el primero desde tu panel.'}</div></section>`;
   // v25 · a quien entra sin haber hecho el test se lo proponemos una vez: es lo que diferencia a FOUND
   const askTest = N && !hasTaste() && !S.feedTestSeen && !lsGet('found_feed_test_no', false);
+  // v31 · feed más limpio: los filtros van plegados detrás de un solo botón
+  const nOn = (S.cats.length ? 1 : 0) + (S.sizeF.length ? 1 : 0) + (S.maxPrice != null ? 1 : 0);
   view.innerHTML = `<div class="reelwrap">
     <div class="reel" id="reel" tabindex="0" aria-label="Prendas para ti. Usa las flechas arriba y abajo para cambiar de prenda">${N ? slides : empty}</div>
     <div class="reeltop" role="group" aria-label="Filtros">
       ${seeSeg()}
-      <button class="chip" data-act="gustos">${hasTaste() ? 'Mis gustos' : 'Haz el test'}</button>
-      ${filterBar('feed')}
+      <button type="button" class="chip fbtn${nOn ? ' on' : ''}" data-act="ffeed" aria-expanded="${S.feedFiltersOpen ? 'true' : 'false'}" aria-controls="fpanel">${ICON.sliders}Filtros${nOn ? ` · ${nOn}` : ''}</button>
+      <div class="fpanel" id="fpanel"${S.feedFiltersOpen ? '' : ' hidden'}>${filterBar('feed')}</div>
     </div>
     ${askTest ? `<div class="feedtest" role="dialog" aria-modal="false" aria-labelledby="ft-t"><div class="ft-in">
       <span class="eyebrow">${T('ftest.eyebrow', 'Antes de empezar')}</span>
@@ -1533,7 +1533,6 @@ VIEWS.descubrir = () => {
       <p>${T('ftest.text', 'Responde 5 preguntas rápidas y ordenamos el feed para ti. En cada prenda verás cuánto encaja contigo.')}</p>
       <div class="ft-acts"><button class="btn" data-act="gustos">${T('ftest.cta', 'Hacer el test')} <span class="arr" aria-hidden="true">→</span></button><button class="btn ghost" data-act="ftestno">${T('ftest.no', 'Ahora no')}</button></div>
       <small>${T('ftest.sub', '1 minuto · gratis · sin registrarte')}</small></div></div>` : ''}
-    ${N ? `<div class="count" id="cnt" aria-hidden="true">1 / ${N}</div>` : ''}
   </div>
   <div class="navbtns"><button data-act="rnav" data-v="-1" aria-label="Prenda anterior">${ICON.up}</button><button data-act="rnav" data-v="1" aria-label="Prenda siguiente">${ICON.down}</button></div>`;
   const r = $('#reel');
@@ -3086,6 +3085,7 @@ document.addEventListener('click', async e => {
     case 'catpick': catDraft = catDraft.includes(v) ? catDraft.filter(c => c !== v) : [...catDraft, v]; renderCats(); break;
     case 'catclear': catDraft = []; renderCats(); break;
     case 'catok': S.cats = [...catDraft]; if (S.route !== 'explorar') S.q = ''; closeDlg(); if (S.route === 'descubrir' || S.route === 'explorar') VIEWS[S.route](); else go('feed'); break;
+    case 'ffeed': { S.feedFiltersOpen = !S.feedFiltersOpen; const fp = $('#fpanel'); if (fp) fp.hidden = !S.feedFiltersOpen; b.setAttribute('aria-expanded', S.feedFiltersOpen ? 'true' : 'false'); break; }
     case 'fclear': S.cats = []; S.maxPrice = null; S.sizeF = []; S.style = 'Todos'; VIEWS[S.route] && VIEWS[S.route](); break;
     case 'sizes': openSizes(); break;
     case 'szpick': tgl(sizeDraft, v); renderSizes(); break;

@@ -2031,3 +2031,12 @@ button.ms-in:active,a.ms-in:active{transform:scale(.98)}
 
 /* v29.5 · el círculo con la inicial de la marca salía estirado (heredaba el relleno de la cabecera) */
 .brandhero>.avatar.lg{padding:0;height:auto;aspect-ratio:1;align-self:center}
+
+/* v31 · feed más limpio: un solo botón «Filtros» que despliega Prendas, Talla y Precio */
+.reeltop .fpanel{flex:1 1 100%;order:1;min-width:0}
+.reeltop .fpanel[hidden]{display:none}
+.reeltop .fpanel .fbar{max-width:720px;margin:0}
+.reeltop>.fbtn{display:inline-flex;align-items:center;gap:7px;min-height:34px;padding:0 14px 0 12px;font-weight:600;transition:transform 140ms cubic-bezier(.23,1,.32,1),background-color 140ms ease,color 140ms ease}
+.reeltop>.fbtn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round}
+.reeltop>.fbtn.on,.reeltop>.fbtn[aria-expanded="true"]{background:#141414;color:#fff}
+.reeltop>.fbtn:active{transform:scale(.96)}
