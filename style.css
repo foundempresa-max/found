@@ -2043,8 +2043,9 @@ button.ms-in:active,a.ms-in:active{transform:scale(.98)}
 
 /* v32 · Feed: la prenda se ve entera (sin recortar), con la misma foto desenfocada de fondo */
 .slide .bgpic{position:absolute;inset:-10%;width:120%;height:120%;object-fit:cover;filter:blur(34px) saturate(1.1);opacity:.9;pointer-events:none}
-.slide .pic{inset:64px 0 132px;width:100%;height:calc(100% - 196px);object-fit:contain;object-position:50% 50%}
-@media (min-width:821px){.slide .pic{inset:72px 0 140px;height:calc(100% - 212px)}}
+.slide .pic{inset:60px 0 184px;width:100%;height:calc(100% - 244px);object-fit:contain;object-position:50% 50%}
+@media (min-width:821px){.slide .pic{inset:72px 0 184px;height:calc(100% - 256px)}}
+.rail small{text-shadow:0 1px 3px rgba(0,0,0,.55),0 0 1px rgba(0,0,0,.4)}
 .slide .info{padding-top:72px;background:linear-gradient(to top,rgba(12,13,12,.84),rgba(12,13,12,.55) 55%,rgba(12,13,12,0))}
 /* el aviso de cómo usar el Feed se aparta solo */
 .reelwrap .hint{animation:hint-out 400ms ease 3.5s forwards}
