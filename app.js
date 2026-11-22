@@ -1499,7 +1499,7 @@ VIEWS.descubrir = () => {
     const m = matchPct(p), fav = S.favs.has(p.id);
     const buy = isUrl(p.buy_url) ? `<a href="${esc(p.buy_url)}" target="_blank" rel="noopener noreferrer" data-track="buy" data-id="${esc(p.id)}" aria-label="Comprar ${esc(p.name)}">${ICON.bag}</a>` : `<button data-act="open" data-id="${esc(p.id)}" aria-label="Cómo comprar ${esc(p.name)}">${ICON.bag}</button>`;
     return `<section class="slide" data-id="${esc(p.id)}" style="background:${tileBg(p)}" aria-label="${esc(p.name)}">
-      ${p.image ? `<img class="pic" src="${esc(p.image)}" alt="${esc(p.name)}">` : art(p, true)}
+      ${p.image ? `<img class="bgpic" src="${esc(p.image)}" alt="" aria-hidden="true" decoding="async"><img class="pic" src="${esc(p.image)}" alt="${esc(p.name)}" decoding="async">` : art(p, true)}
       ${i === 0 ? '<div class="hint">Desliza hacia arriba · doble toque para guardar</div>' : ''}
       ${p.images.length > 1 ? `<button class="morepics" data-act="open" data-id="${esc(p.id)}">Ver ${p.images.length} fotos</button>` : ''}
       ${p._surprise ? '<span class="surprise">Algo distinto a tu estilo</span>' : ''}
@@ -2748,6 +2748,15 @@ function addPhotos(files) {
   refreshPhotos();
   if (bad) toast('Algunas fotos no se han añadido: tienen que ser PNG, JPG o WEBP de menos de 15 MB.');
   else if (skipped) toast(`Como máximo ${MAX_PHOTOS} fotos por prenda.`);
+  else warnSmallPhotos(files);
+}
+// v32 · las fotos pequeñas se ven borrosas a pantalla completa en el Feed: avisamos (sin impedir subirlas)
+async function warnSmallPhotos(files) {
+  let small = 0;
+  for (const f of files) {
+    try { const b = await createImageBitmap(f); if (Math.min(b.width, b.height) < 800) small++; b.close && b.close(); } catch {}
+  }
+  if (small) toast(small === 1 ? 'Una foto es pequeña (menos de 800 px) y se verá borrosa en el Feed. Si puedes, súbela más grande.' : `${small} fotos son pequeñas (menos de 800 px) y se verán borrosas en el Feed. Si puedes, súbelas más grandes.`);
 }
 
 async function publish() {
