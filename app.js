@@ -291,11 +291,22 @@ function norm(r) {
 async function shrink(file, max, quality, type = 'image/jpeg') {
   const bmp = await createImageBitmap(file);
   const r = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const W = Math.round(bmp.width * r), H = Math.round(bmp.height * r);
+  // v34 · reducir en pasos de la mitad y con suavizado alto: la foto queda nítida, sin dientes ni moaré en los tejidos
+  let src = bmp, sw = bmp.width, sh = bmp.height;
+  while (sw / 2 >= W * 1.05 && sh / 2 >= H * 1.05) {
+    const t = document.createElement('canvas'); t.width = Math.round(sw / 2); t.height = Math.round(sh / 2);
+    const tc = t.getContext('2d'); tc.imageSmoothingEnabled = true; tc.imageSmoothingQuality = 'high';
+    tc.drawImage(src, 0, 0, sw, sh, 0, 0, t.width, t.height);
+    src = t; sw = t.width; sh = t.height;
+  }
   const c = document.createElement('canvas');
-  c.width = Math.round(bmp.width * r); c.height = Math.round(bmp.height * r);
+  c.width = W; c.height = H;
   const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   if (type === 'image/jpeg') { ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, c.width, c.height); }
-  ctx.drawImage(bmp, 0, 0, c.width, c.height);
+  ctx.drawImage(src, 0, 0, sw, sh, 0, 0, W, H);
+  if (bmp.close) bmp.close();
   return new Promise(res => c.toBlob(res, type, quality));
 }
 // v19 · fotos de prendas en WebP (pesan ~30 % menos que JPG con la misma calidad); si el navegador no sabe crear WebP, JPG
@@ -399,7 +410,7 @@ function supabaseApi() {
       const images = [];
       for (const [i, ph] of photos.slice(0, MAX_PHOTOS).entries()) {
         if (ph.url) { images.push(ph.url); continue; }
-        const { blob, type, ext } = await shrinkBest(ph.file, 1400, 0.82);
+        const { blob, type, ext } = await shrinkBest(ph.file, 2000, 0.9);
         const path = `${uid}/${Date.now()}-${i}.${ext}`;
         const up = await sb.storage.from(bucket).upload(path, blob, { contentType: type, cacheControl: '31536000' });
         fail(up.error);
@@ -2780,9 +2791,9 @@ function addPhotos(files) {
 async function warnSmallPhotos(files) {
   let small = 0;
   for (const f of files) {
-    try { const b = await createImageBitmap(f); if (Math.min(b.width, b.height) < 800) small++; b.close && b.close(); } catch {}
+    try { const b = await createImageBitmap(f); if (Math.min(b.width, b.height) < 1000) small++; b.close && b.close(); } catch {}
   }
-  if (small) toast(small === 1 ? 'Una foto es pequeña (menos de 800 px) y se verá borrosa en el Feed. Si puedes, súbela más grande.' : `${small} fotos son pequeñas (menos de 800 px) y se verán borrosas en el Feed. Si puedes, súbelas más grandes.`);
+  if (small) toast(small === 1 ? 'Una foto es pequeña (menos de 1000 px) y se verá borrosa en el Feed. Si puedes, súbela más grande.' : `${small} fotos son pequeñas (menos de 1000 px) y se verán borrosas en el Feed. Si puedes, súbelas más grandes.`);
 }
 
 async function publish() {
