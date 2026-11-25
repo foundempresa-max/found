@@ -1490,6 +1490,31 @@ function feedOrder(list) {
   return out.map(x => (x.surprise ? Object.assign(Object.create(x.p), x.p, { _surprise: true }) : x.p));
 }
 
+/* v33 · Feed: cada foto se coloca según su forma.
+   Si casi cabe en la pantalla (se recortaría ≤ 15 %), llena la pantalla entera, como en Instagram.
+   Si no, se ve entera, lo más grande posible, en una tarjeta con esquinas redondas sobre su propia foto desenfocada. */
+function fitPic(img) {
+  const slide = img.closest('.slide'), box = img.parentElement;
+  if (!slide || !box || !img.naturalWidth) return;
+  const ir = img.naturalWidth / img.naturalHeight, fr = slide.clientWidth / slide.clientHeight;
+  const crop = ir > fr ? 1 - fr / ir : 1 - ir / fr;
+  const fill = crop <= 0.15;
+  slide.classList.toggle('fill', fill);
+  slide.classList.add('fitted');
+  if (fill) { img.style.width = img.style.height = ''; return; }
+  const bw = box.clientWidth, bh = box.clientHeight; if (!bw || !bh) return;
+  const k = Math.min(bw / img.naturalWidth, bh / img.naturalHeight);
+  img.style.width = Math.round(img.naturalWidth * k) + 'px';
+  img.style.height = Math.round(img.naturalHeight * k) + 'px';
+}
+let fitRO = null;
+function fitFeedPics(r) {
+  if (!r) return;
+  r.querySelectorAll('.slide .pic').forEach(img => { if (img.complete) fitPic(img); else img.addEventListener('load', () => fitPic(img), { once: true }); });
+  if (fitRO) fitRO.disconnect();
+  if ('ResizeObserver' in window) { fitRO = new ResizeObserver(() => r.querySelectorAll('.slide .pic').forEach(fitPic)); fitRO.observe(r); }
+}
+
 /* --- Descubrir (estilo reel) --- */
 VIEWS.descubrir = () => {
   document.body.classList.add('noscroll');
@@ -1499,7 +1524,7 @@ VIEWS.descubrir = () => {
     const m = matchPct(p), fav = S.favs.has(p.id);
     const buy = isUrl(p.buy_url) ? `<a href="${esc(p.buy_url)}" target="_blank" rel="noopener noreferrer" data-track="buy" data-id="${esc(p.id)}" aria-label="Comprar ${esc(p.name)}">${ICON.bag}</a>` : `<button data-act="open" data-id="${esc(p.id)}" aria-label="Cómo comprar ${esc(p.name)}">${ICON.bag}</button>`;
     return `<section class="slide" data-id="${esc(p.id)}" style="background:${tileBg(p)}" aria-label="${esc(p.name)}">
-      ${p.image ? `<img class="bgpic" src="${esc(p.image)}" alt="" aria-hidden="true" decoding="async"><img class="pic" src="${esc(p.image)}" alt="${esc(p.name)}" decoding="async">` : art(p, true)}
+      ${p.image ? `<img class="bgpic" src="${esc(p.image)}" alt="" aria-hidden="true" decoding="async"><div class="picbox"><img class="pic" src="${esc(p.image)}" alt="${esc(p.name)}" decoding="async"></div>` : art(p, true)}
       ${i === 0 ? '<div class="hint">Desliza hacia arriba · doble toque para guardar</div>' : ''}
       ${p.images.length > 1 ? `<button class="morepics" data-act="open" data-id="${esc(p.id)}">Ver ${p.images.length} fotos</button>` : ''}
       ${p._surprise ? '<span class="surprise">Algo distinto a tu estilo</span>' : ''}
@@ -1536,6 +1561,7 @@ VIEWS.descubrir = () => {
   </div>
   <div class="navbtns"><button data-act="rnav" data-v="-1" aria-label="Prenda anterior">${ICON.up}</button><button data-act="rnav" data-v="1" aria-label="Prenda siguiente">${ICON.down}</button></div>`;
   const r = $('#reel');
+  fitFeedPics(r);
   if (r && N) {
     // se apunta como «vista» la prenda en la que la persona se para al menos un segundo
     let seenT = 0;
