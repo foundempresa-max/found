@@ -417,6 +417,7 @@ function supabaseApi() {
         images.push(sb.storage.from(bucket).getPublicUrl(path).data.publicUrl);
       }
       const row = { name: f.name, price: f.price, category: f.cat, tags: f.tags, sizes: f.sizes, gender: f.gender, color: f.color, description: f.desc, buy_url: f.buy_url || null, image_url: images[0] || null, images };
+      if (f.status) row.status = f.status;
       const write = r => id ? sb.from('products').update(r).eq('id', id) : sb.from('products').insert({ ...r, brand_id: uid });
       // si aún no se han ejecutado tallas.sql o fotos.sql, se guarda igual sin esas columnas (y solo con la portada)
       const out = {}; let r = row, { error } = await write(r);
@@ -446,6 +447,19 @@ function supabaseApi() {
       const up = await sb.storage.from('brand-images').upload(path, blob, { contentType: o.type, cacheControl: '31536000' });
       if (up.error) throw new Error(/bucket/i.test(up.error.message || '') ? 'Las imágenes de marca aún no están activadas (falta ejecutar marcas.sql).' : kind === 'style' && /row-level|policy|security/i.test(up.error.message || '') ? 'Para subir fotos de estilos falta ejecutar supabase/fotos-estilos.sql en Supabase.' : up.error.message);
       return sb.storage.from('brand-images').getPublicUrl(path).data.publicUrl;
+    },
+    // --- v35 · el Creador gestiona marcas ---
+    async adminBrandProfile(id) { const { data, error } = await sb.from('profiles').select('*').eq('id', id).maybeSingle(); fail(error); return data; },
+    async adminBrandAccount(body) {
+      const { data, error } = await sb.functions.invoke('crear-marca', { body });
+      if (error) {
+        let msg = error.message || 'Error';
+        try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch {}
+        if (/Failed to send|not found|404/i.test(msg)) msg = 'La función «crear-marca» no responde. Vuelve a probar en un momento.';
+        throw new Error(msg);
+      }
+      if (data && data.error) throw new Error(data.error);
+      return data;
     },
     async getSettings() { try { const { data, error } = await sb.from('site_settings').select('value').eq('key', 'main').maybeSingle(); if (error) return null; return data ? data.value : null; } catch { return null; } },
     async saveSettings(v) {
@@ -711,6 +725,14 @@ function demoApi() {
     async adminResolveReport(id) { const r = (db.reports || []).find(x => x.id === id); if (r) r.status = 'resolved'; save(); },
     async adminResolveReportsFor(pid) { (db.reports || []).forEach(r => { if (r.product_id === pid) r.status = 'resolved'; }); save(); },
     async uploadBrandImage(uid, file, kind) { const o = BRAND_IMG[kind]; return blobToDataUrl(await shrink(file, kind === 'logo' ? 240 : kind === 'style' ? 520 : 1000, 0.72, o.type)); },
+    async adminBrandProfile(id) { const u = db.users.find(x => x.id === id); return u ? { ...u } : null; },
+    async adminBrandAccount(body) {
+      if (body.action === 'link') { const u = db.users.find(x => x.id === body.user_id); return { id: u.id, email: u.email, link: baseUrl() + '#/nueva-clave' }; }
+      const email = String(body.email || '').trim().toLowerCase();
+      if (db.users.some(u => u.email === email)) throw new Error('Ya hay una cuenta con ese correo. Búscala en Usuarios (si es de comprador, cámbiala a Marca).');
+      const u = { id: 'u' + Date.now(), email, role: 'brand', brand_name: body.brand_name, brand_bio: '', contact_email: email, styles: [], cats: [], budget: 150 };
+      db.users.push(u); save(); return { id: u.id, email, link: baseUrl() + '#/nueva-clave' };
+    },
     async removeProduct(id) { db.products = db.products.filter(p => p.id !== id); Object.keys(db.favs).forEach(k => { db.favs[k] = db.favs[k].filter(x => x !== id); }); save(); },
     async getSettings() { return db.settings || null; },
     async saveSettings(v) { if (v === null) delete db.settings; else db.settings = v; save(); },
@@ -1065,7 +1087,7 @@ function renderNav() {
     ['marcas', 'Marcas', ICON.compass, ['marcas', 'marca', 'vender']],
     ['descubrir', 'Feed', ICON.play, ['descubrir', 'explorar', 'gustos']],
     ['guardados', 'Favoritas', ICON.heart, ['guardados'], nfav],
-    [acct, 'Mi cuenta', ICON.user, ['cuenta', 'entrar', 'panel', 'mensajes', 'admin', 'pago', 'nueva-clave'], (isBrand() || isAdmin()) ? nb : '']
+    [acct, 'Mi cuenta', ICON.user, ['cuenta', 'entrar', 'panel', 'gestionar', 'mensajes', 'admin', 'pago', 'nueva-clave'], (isBrand() || isAdmin()) ? nb : '']
   ];
   const curT = t => t[3].includes(r) ? ' aria-current="page"' : '';
   const href = n => n === 'descubrir' ? '#/feed' : '#/' + n;
@@ -1906,7 +1928,7 @@ VIEWS.admin = async () => {
   await renderAdminTab();
 };
 /* ---------- pestaña Visitas ---------- */
-const PAGE_NAMES = { inicio: 'Inicio', descubrir: 'Descubrir', explorar: 'Explorar', marcas: 'Directorio de marcas', marca: 'Página de una marca', prenda: 'Ficha de una prenda', vender: 'Vende en ' + C.appName, guardados: 'Guardados', gustos: 'Test de estilo', entrar: 'Entrar / crear cuenta', cuenta: 'Cuenta', panel: 'Panel de marca', pago: 'Pago', mensajes: 'Mensajes' };
+const PAGE_NAMES = { inicio: 'Inicio', descubrir: 'Descubrir', explorar: 'Explorar', marcas: 'Directorio de marcas', marca: 'Página de una marca', prenda: 'Ficha de una prenda', vender: 'Vende en ' + C.appName, guardados: 'Guardados', gustos: 'Test de estilo', entrar: 'Entrar / crear cuenta', cuenta: 'Cuenta', panel: 'Panel de marca', gestionar: 'Gestionar una marca', pago: 'Pago', mensajes: 'Mensajes' };
 const nfmt = n => NF_INT.format(Number(n || 0));
 const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
 const shortDate = iso => new Date(iso + 'T12:00:00Z').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -2270,7 +2292,7 @@ function fillUsers() {
     const canDel = !me(u) && u.role !== 'admin' && !S.adminUsersMissing;
     return `<div class="pitem uitem"><div><b>${esc(title)}${me(u) ? ' (tú)' : ''}</b><small>${esc(meta)}</small>${subTag(u)}</div>
       <div class="acts"><label><span class="sr">Tipo de cuenta</span><select class="rolesel" data-id="${esc(u.id)}" ${me(u) ? 'disabled' : ''}>${[['buyer', 'Comprador'], ['brand', 'Marca'], ['admin', 'Creador']].map(([v, l]) => `<option value="${v}"${u.role === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
-      ${u.role === 'brand' ? chatBtn(u.id, null, 'Mensaje') : ''}${canDel ? `<button class="btn ghost small danger" data-act="deluser" data-id="${esc(u.id)}">Borrar</button>` : ''}</div></div>`;
+      ${u.role === 'brand' ? `<a class="btn small" href="#/gestionar/${esc(u.id)}">Gestionar</a><button class="btn ghost small" data-act="brandlink" data-id="${esc(u.id)}">Enlace de acceso</button>` + chatBtn(u.id, null, 'Mensaje') : ''}${canDel ? `<button class="btn ghost small danger" data-act="deluser" data-id="${esc(u.id)}">Borrar</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty">No hay cuentas con ese filtro.</div>';
 }
 async function deleteUser(id, btn) {
@@ -2396,6 +2418,12 @@ async function renderAdminTab() {
       box.innerHTML = `${r.missing ? `<section class="card-box editcta" style="max-width:820px;margin-bottom:16px"><div><h2 style="margin-bottom:6px">Activa la gestión de cuentas</h2><p class="muted">Para ver el correo de cada cuenta y poder borrarlas, ejecuta <b>supabase/cuentas.sql</b> en Supabase &gt; SQL Editor y recarga esta página.</p></div></section>` : ''}
         <div class="toolbar ufilters" style="max-width:820px"><input type="search" id="usearch" placeholder="Busca por correo o nombre de marca" aria-label="Buscar usuarios" value="${esc(S.userQ || '')}">
           <div class="seg mini" role="group" aria-label="Tipo de cuenta">${[['all', 'Todas'], ['buyer', 'Compradores'], ['brand', 'Marcas'], ['admin', 'Creadores']].map(([v, l]) => `<button data-act="urole" data-v="${v}" aria-pressed="${(S.userRole || 'all') === v}">${l}</button>`).join('')}</div></div>
+        <section class="card-box newbrand" style="max-width:820px;margin-bottom:18px"><h2 style="margin-bottom:6px">Dar de alta una marca</h2>
+          <p class="muted" style="margin-bottom:14px">Crea tú la cuenta y súbele el logo, la portada y las prendas. Después le mandas un enlace para que elija su contraseña y la marca se lo encuentra todo hecho.</p>
+          <div class="row2"><label class="field"><span>Nombre de la marca</span><input type="text" id="nb-name" maxlength="60" placeholder="Ej. Lino del Norte"></label>
+          <label class="field"><span>Correo de la marca</span><input type="email" id="nb-email" maxlength="254" placeholder="hola@marca.com" autocomplete="off"></label></div>
+          <p class="msg" id="nb-msg" role="alert"></p>
+          <button class="btn" data-act="newbrand">Crear cuenta de marca</button></section>
         <p class="muted rescount" id="ucount"></p>
         <div class="plist" id="ulist" style="max-width:820px"></div>
         <section class="card-box" id="blockbox" style="max-width:820px;margin-top:28px"></section>`;
@@ -2620,6 +2648,7 @@ VIEWS.pago = async () => {
 
 /* --- Panel de marca --- */
 VIEWS.panel = async () => {
+  if (actingAs()) return VIEWS.gestionar(S.actAs.id);
   if (!S.user) { toast('Entra con una cuenta de marca para ver tu panel.'); S.authMode = 'up'; S.authRole = 'brand'; return go('entrar'); }
   if (!isBrand()) { view.innerHTML = '<div class="wrap page has-tabbar"><div class="empty">Tu cuenta es de comprador. Para vender, crea una cuenta de marca con otro correo.</div></div>'; return; }
   try { S.counts = await api.saveCounts(S.user.id); } catch { S.counts = {}; }
@@ -2628,6 +2657,72 @@ VIEWS.panel = async () => {
   await refreshUnread();
   renderPanel();
 };
+/* --- v35 · Gestionar marca (solo Creador): el panel de marca, pero de otra cuenta --- */
+const actingAs = () => (isAdmin() && S.route === 'gestionar' && S.actAs) ? S.actAs : null;
+function setPanelProf(patch) { if (actingAs()) S.actAs = { ...S.actAs, ...patch }; else S.profile = { ...S.profile, ...patch }; }
+const reloadPanel = () => actingAs() ? VIEWS.gestionar(S.actAs.id) : VIEWS.panel();
+function actAsBarHTML(b) {
+  return `<div class="actasbar" role="status"><span><b>Modo Creador</b> · Estás gestionando «${esc(b.brand_name || 'Marca')}». Todo lo que guardes se publica a su nombre.</span>
+    <span class="actas-acts"><button class="btn ghost small" data-act="brandlink" data-id="${esc(b.id)}">Enlace de acceso para la marca</button><a class="btn dark small" href="#/admin">Volver al Creador</a></span></div>`;
+}
+VIEWS.gestionar = async id => {
+  if (!isAdmin()) { view.innerHTML = '<div class="wrap page has-tabbar"><div class="empty">Solo el Creador puede gestionar marcas.</div></div>'; return; }
+  if (!id) return go('admin');
+  if (!S.actAs || S.actAs.id !== id) {
+    view.innerHTML = '<div class="wrap page has-tabbar"><p class="muted" style="padding:40px 0">Cargando la marca…</p></div>';
+    let prof = null; try { prof = await api.adminBrandProfile(id); } catch (e) { toast(e.message); }
+    if (S.route !== 'gestionar') return;
+    if (!prof || prof.role !== 'brand') { view.innerHTML = '<div class="wrap page has-tabbar"><div class="empty">Esta cuenta no es de marca. <a href="#/admin">Volver al Creador</a></div></div>'; return; }
+    S.actAs = { ...prof, id };
+    S.editing = null; S.formTags = []; S.formSizes = []; S.formGender = ''; clearPhotos(); S.draft = null;
+  }
+  await refreshProducts();
+  try { S.counts = await api.saveCounts(id); } catch { S.counts = {}; }
+  try { S.ev = api.eventCounts ? await api.eventCounts(S.statsDays) : null; } catch { S.ev = null; }
+  if (S.route === 'gestionar') renderPanel();
+};
+function brandInviteMail(b, link) {
+  const body = `Hola, equipo de ${b.brand_name}:\n\n¡Ya estáis en ${C.appName}! Os hemos creado la cuenta de marca con este correo (${b.email}) y hemos preparado vuestra página.\n\nPara entrar, abrid este enlace y elegid vuestra contraseña:\n${link}\n\nEl enlace caduca en una hora. Si se os pasa, entrad en ${C.siteUrl || baseUrl()}#/entrar, pulsad «¿Has olvidado tu contraseña?» y escribid este mismo correo.\n\nDesde «Mi panel» podréis ver cuánta gente mira vuestras prendas, cambiar lo que queráis y subir prendas nuevas.\n\nUn saludo,\nEl equipo de ${C.appName}`;
+  return { subject: `Vuestra cuenta en ${C.appName} está lista`, body };
+}
+function showBrandLink(b, link, isNew) {
+  const m = brandInviteMail(b, link);
+  dlg.innerHTML = `<div style="position:relative"><button class="close" data-act="closeDlg" aria-label="Cerrar">×</button><div class="aedit">
+    <h2 style="margin-bottom:8px">${isNew ? 'Cuenta creada' : 'Enlace nuevo'}</h2>
+    <p class="muted" style="margin-bottom:14px">${isNew ? `«${esc(b.brand_name)}» ya tiene cuenta de marca. Ahora puedes subirle el logo, la portada y las prendas. ` : ''}Manda este enlace a la marca para que elija su contraseña. Caduca en una hora; si caduca, pide otro desde «Gestionar» o que use «¿Has olvidado tu contraseña?».</p>
+    <label class="field"><span>Enlace de acceso</span><input type="text" id="bl-link" readonly value="${esc(link)}"></label>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+      <a class="btn small" href="${esc(mailHref(b.email, m))}">Enviar por correo</a>
+      <button class="btn ghost small" data-act="blcopy">Copiar mensaje</button>
+      ${isNew ? `<a class="btn dark small" href="#/gestionar/${esc(b.id)}">Subir sus prendas ahora →</a>` : ''}
+    </div></div></div>`;
+  S.blMsg = m.body;
+  if (!dlg.open) dlg.showModal();
+}
+async function brandLink(id, btn) {
+  if (btn) { btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = 'Generando…'; }
+  try {
+    const r = await api.adminBrandAccount({ action: 'link', user_id: id });
+    const u = (S.adminUsers || []).find(x => x.id === id) || S.actAs || {};
+    showBrandLink({ id, email: r.email, brand_name: u.brand_name || 'vuestra marca' }, r.link, false);
+  } catch (e) { toast('No se pudo generar el enlace: ' + e.message); }
+  if (btn) { btn.disabled = false; btn.textContent = btn.dataset.t; }
+}
+async function createBrand(btn) {
+  const m = $('#nb-msg'); m.className = 'msg';
+  const name = $('#nb-name').value.trim(), email = $('#nb-email').value.trim().toLowerCase();
+  const bad = t => { m.classList.add('err'); m.textContent = t; };
+  if (!name) return bad('Escribe el nombre de la marca.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return bad('El correo no parece correcto.');
+  btn.disabled = true; btn.textContent = 'Creando…';
+  try {
+    const r = await api.adminBrandAccount({ action: 'create', email, brand_name: name });
+    try { S.adminUsers = (await api.adminUsers()).list; } catch {}
+    $('#nb-name').value = ''; $('#nb-email').value = ''; fillUsers();
+    showBrandLink({ id: r.id, email: r.email, brand_name: name }, r.link, true);
+  } catch (e) { bad(e.message); }
+  btn.disabled = false; btn.textContent = 'Crear cuenta de marca';
+}
 function subStatusBox() {
   const b = S.billing;
   if (!b || b.missing) return '';
@@ -2656,7 +2751,8 @@ function paywallHTML() {
   </section>`;
 }
 function renderPanel() {
-  const mine = S.allProducts.filter(p => p.brand_id === S.user.id);
+  const AS = actingAs(), PU = AS ? AS.id : S.user.id, PP = AS || S.profile;
+  const mine = S.allProducts.filter(p => p.brand_id === PU);
   const saves = mine.reduce((a, p) => a + (S.counts[p.id] || 0), 0);
   const evOf = p => (S.ev && S.ev[p.id]) || { views: 0, buys: 0 };
   const views = mine.reduce((a, p) => a + evOf(p).views, 0), buys = mine.reduce((a, p) => a + evOf(p).buys, 0);
@@ -2664,17 +2760,17 @@ function renderPanel() {
   if (S.ev) mine.sort((a, b) => evOf(b).views - evOf(a).views);
   const ed = S.editing ? mine.find(p => p.id === S.editing) : null;
   const d = S.draft && S.draft.form ? S.draft.form : (ed ? { name: ed.name, price: ed.price, cat: ed.cat, color: ed.color, desc: ed.desc, buy_url: ed.buy_url } : { name: '', price: '', cat: C.categories[0], color: '#E6335F', desc: '', buy_url: '' });
-  const act = isActiveBrand();
-  view.innerHTML = `<div class="wrap page has-tabbar"><div class="pagehead"><div><span class="eyebrow">Panel de marca</span><h1 style="margin-top:12px">${esc(S.profile.brand_name || 'Tu marca')}</h1><p class="muted">Sube productos y mira cómo responden los compradores.${modOn() && !S.modMissing ? ' Cada prenda nueva la revisamos antes de mostrarla.' : ''}</p><p class="acctlinks"><a href="#/mensajes">Mensajes</a> · <a href="#/nueva-clave">Cambiar contraseña</a> · <button type="button" class="linkbtn" data-act="logout">Cerrar sesión</button></p></div>
-      <div class="ph-acts"><a class="btn ghost small" href="#/mensajes">Mensajes <span class="tabn" data-unread${S.unread ? '' : ' hidden'}>${S.unread}</span></a><a class="btn ghost small" href="#/marca/${esc(S.user.id)}">Ver mi página pública</a></div></div>
-    <div id="panel-msgs">${panelMsgsHTML()}</div>
+  const act = AS ? true : isActiveBrand();
+  view.innerHTML = `<div class="wrap page has-tabbar">${AS ? actAsBarHTML(AS) : ''}<div class="pagehead"><div><span class="eyebrow">${AS ? 'Gestionando como Creador' : 'Panel de marca'}</span><h1 style="margin-top:12px">${esc(PP.brand_name || 'Tu marca')}</h1><p class="muted">${AS ? 'Lo que subas aquí se publica a nombre de la marca y sin pasar por revisión.' : 'Sube productos y mira cómo responden los compradores.' + (modOn() && !S.modMissing ? ' Cada prenda nueva la revisamos antes de mostrarla.' : '')}</p>${AS ? '' : `<p class="acctlinks"><a href="#/mensajes">Mensajes</a> · <a href="#/nueva-clave">Cambiar contraseña</a> · <button type="button" class="linkbtn" data-act="logout">Cerrar sesión</button></p>`}</div>
+      <div class="ph-acts">${AS ? chatBtn(PU, null, 'Mensaje') : `<a class="btn ghost small" href="#/mensajes">Mensajes <span class="tabn" data-unread${S.unread ? '' : ' hidden'}>${S.unread}</span></a>`}<a class="btn ghost small" href="#/marca/${esc(PU)}">${AS ? 'Ver su página pública' : 'Ver mi página pública'}</a></div></div>
+    <div id="panel-msgs">${AS ? '' : panelMsgsHTML()}</div>
     ${act && billingOn() ? subStatusBox() : ''}
     <div class="panel${act ? ' act' : ''}${ed ? ' editing' : ''}">
       <div style="display:grid;gap:22px">
         ${act ? '' : paywallHTML()}
         <section class="card-box" aria-label="Producto"${act ? '' : ' hidden'}>
           <h2 style="margin-bottom:14px">${ed ? 'Editar producto' : 'Sube un producto'}</h2>
-          ${!ed && (!S.profile.logo_url || !S.profile.cover_url) ? `<p class="warnbox">Antes de publicar, completa tu <b>Perfil de marca</b> (más abajo): ${[!S.profile.logo_url ? 'el logo' : '', !S.profile.cover_url ? 'la foto de portada' : ''].filter(Boolean).join(' y ')}. Es lo primero que ven los compradores.</p>` : ''}
+          ${!ed && (!PP.logo_url || !PP.cover_url) ? `<p class="warnbox">Antes de publicar, completa tu <b>Perfil de marca</b> (más abajo): ${[!PP.logo_url ? 'el logo' : '', !PP.cover_url ? 'la foto de portada' : ''].filter(Boolean).join(' y ')}. Es lo primero que ven los compradores.</p>` : ''}
           <label class="field"><span>Nombre del producto</span><input type="text" id="f-name" maxlength="80" value="${esc(d.name)}" placeholder="Ej. Camisa oversize lino"></label>
           <div class="row2">
             <label class="field"><span>Precio (${esc(C.currency)})</span><input type="number" id="f-price" min="0.5" step="0.5" value="${esc(d.price)}"></label>
@@ -2694,30 +2790,30 @@ function renderPanel() {
         <section class="card-box" aria-label="Perfil de marca">
           <h2 style="margin-bottom:14px">Perfil de marca</h2>
           <div class="brandprev" aria-label="Vista previa de la cabecera de tu página">
-            <div class="bp-cover" id="bp-cover">${S.profile.cover_url ? `<img src="${esc(S.profile.cover_url)}" alt="">` : '<span>Tu portada</span>'}</div>
-            <div class="bp-row"><span class="bp-logo" id="bp-logo">${S.profile.logo_url ? `<img src="${esc(S.profile.logo_url)}" alt="">` : esc(initial(S.profile.brand_name))}</span><b id="bp-name">${esc(S.profile.brand_name || 'Tu marca')}</b></div>
+            <div class="bp-cover" id="bp-cover">${PP.cover_url ? `<img src="${esc(PP.cover_url)}" alt="">` : '<span>Tu portada</span>'}</div>
+            <div class="bp-row"><span class="bp-logo" id="bp-logo">${PP.logo_url ? `<img src="${esc(PP.logo_url)}" alt="">` : esc(initial(PP.brand_name))}</span><b id="bp-name">${esc(PP.brand_name || 'Tu marca')}</b></div>
           </div>
           <div class="row2">
             <div class="field"><span>Logo <em class="req">obligatorio</em></span><input type="file" id="p-logo" accept="image/png,image/jpeg,image/webp">
-              <small class="muted">${S.profile.logo_url ? 'Para cambiarlo, elige otra imagen. ' : ''}Cuadrado, mínimo 300 × 300 px. Un PNG con fondo transparente queda mejor.</small></div>
+              <small class="muted">${PP.logo_url ? 'Para cambiarlo, elige otra imagen. ' : ''}Cuadrado, mínimo 300 × 300 px. Un PNG con fondo transparente queda mejor.</small></div>
             <div class="field"><span>Foto de portada <em class="req">obligatoria</em></span><input type="file" id="p-cover" accept="image/png,image/jpeg,image/webp">
-              <small class="muted">${S.profile.cover_url ? 'Para cambiarla, elige otra imagen. ' : ''}Horizontal, mínimo 1600 × 600 px. Es lo que se ve en la portada de ${esc(C.appName)}.</small></div>
+              <small class="muted">${PP.cover_url ? 'Para cambiarla, elige otra imagen. ' : ''}Horizontal, mínimo 1600 × 600 px. Es lo que se ve en la portada de ${esc(C.appName)}.</small></div>
           </div>
-          <label class="field"><span>Nombre de la marca</span><input type="text" id="p-brand" maxlength="60" value="${esc(S.profile.brand_name || '')}"></label>
+          <label class="field"><span>Nombre de la marca</span><input type="text" id="p-brand" maxlength="60" value="${esc(PP.brand_name || '')}"></label>
           <div class="row2">
-            <label class="field"><span>Ciudad</span><input type="text" id="p-city" maxlength="60" value="${esc(S.profile.brand_city || '')}" placeholder="Ej. Bilbao" autocomplete="address-level2"></label>
-            <label class="field"><span>Correo de contacto público</span><input type="email" id="p-contact" value="${esc(S.profile.contact_email || '')}"></label>
+            <label class="field"><span>Ciudad</span><input type="text" id="p-city" maxlength="60" value="${esc(PP.brand_city || '')}" placeholder="Ej. Bilbao" autocomplete="address-level2"></label>
+            <label class="field"><span>Correo de contacto público</span><input type="email" id="p-contact" value="${esc(PP.contact_email || '')}"></label>
           </div>
           <div class="row2">
-            <label class="field"><span>Instagram</span><input type="text" id="p-ig" maxlength="80" value="${esc(S.profile.instagram ? '@' + S.profile.instagram : '')}" placeholder="@tumarca" autocomplete="off"></label>
-            <label class="field"><span>Web o tienda online</span><input type="url" id="p-web" maxlength="300" value="${esc(S.profile.website || '')}" placeholder="https://tumarca.com"></label>
+            <label class="field"><span>Instagram</span><input type="text" id="p-ig" maxlength="80" value="${esc(PP.instagram ? '@' + PP.instagram : '')}" placeholder="@tumarca" autocomplete="off"></label>
+            <label class="field"><span>Web o tienda online</span><input type="url" id="p-web" maxlength="300" value="${esc(PP.website || '')}" placeholder="https://tumarca.com"></label>
           </div>
-          <label class="field"><span>Frase corta</span><textarea id="p-bio" maxlength="160" rows="2" placeholder="Ej. Lino europeo cosido en Bilbao en tiradas cortas.">${esc(S.profile.brand_bio || '')}</textarea><small class="muted">Sale debajo de vuestro nombre. Máximo 160 caracteres.</small></label>
-          <label class="field"><span>Vuestra historia</span><textarea id="p-story" maxlength="1500" rows="5" placeholder="Cómo empezasteis, quién hace las prendas, dónde, con qué materiales…">${esc(S.profile.brand_story || '')}</textarea><small class="muted">Es lo que convence a quien no os conoce. Sale en vuestra página.</small></label>
-          <div class="field"><span>Sellos (elige los que sean verdad)</span><div class="chips" id="p-badges">${BADGES.map(x => `<button type="button" class="chip" data-act="pbadge" data-v="${esc(x)}" aria-pressed="${(S.profile.brand_badges || []).includes(x)}">${esc(x)}</button>`).join('')}</div></div>
+          <label class="field"><span>Frase corta</span><textarea id="p-bio" maxlength="160" rows="2" placeholder="Ej. Lino europeo cosido en Bilbao en tiradas cortas.">${esc(PP.brand_bio || '')}</textarea><small class="muted">Sale debajo de vuestro nombre. Máximo 160 caracteres.</small></label>
+          <label class="field"><span>Vuestra historia</span><textarea id="p-story" maxlength="1500" rows="5" placeholder="Cómo empezasteis, quién hace las prendas, dónde, con qué materiales…">${esc(PP.brand_story || '')}</textarea><small class="muted">Es lo que convence a quien no os conoce. Sale en vuestra página.</small></label>
+          <div class="field"><span>Sellos (elige los que sean verdad)</span><div class="chips" id="p-badges">${BADGES.map(x => `<button type="button" class="chip" data-act="pbadge" data-v="${esc(x)}" aria-pressed="${(PP.brand_badges || []).includes(x)}">${esc(x)}</button>`).join('')}</div></div>
           <fieldset class="shopfs"><legend>Envío, entrega y devoluciones</legend>
             <p class="muted">Lo rellenas una vez y sale en todas tus prendas. Es lo que más se pregunta antes de comprar.</p>
-            ${(() => { const sh = normShop(S.profile.shop_info), v = x => x == null ? '' : x; return `<div class="row2">
+            ${(() => { const sh = normShop(PP.shop_info), v = x => x == null ? '' : x; return `<div class="row2">
               <label class="field"><span>Gastos de envío (${esc(C.currency)})</span><input type="number" id="s-ship" min="0" max="999" step="0.01" value="${v(sh.ship)}" placeholder="0 = gratis"></label>
               <label class="field"><span>Envío gratis desde (${esc(C.currency)})</span><input type="number" id="s-free" min="0" max="9999" step="1" value="${v(sh.freeFrom)}" placeholder="Opcional"></label></div>
             <div class="row2">
@@ -2738,7 +2834,7 @@ function renderPanel() {
           <div class="stat hl"><b>${S.ev ? views : '—'}</b><span>${views === 1 ? 'clic' : 'clics'} en tus prendas</span></div>
           <div class="stat hl"><b>${S.ev ? buys : '—'}</b><span>${buys === 1 ? 'visita' : 'visitas'} a tu tienda</span></div>
           <div class="stat"><b>${saves}</b><span>guardados <small>(siempre)</small></span></div>
-          <div class="stat"><b>${S.fcounts[S.user.id] || 0}</b><span>${(S.fcounts[S.user.id] || 0) === 1 ? 'seguidor' : 'seguidores'}</span></div>
+          <div class="stat"><b>${S.fcounts[PU] || 0}</b><span>${(S.fcounts[PU] || 0) === 1 ? 'seguidor' : 'seguidores'}</span></div>
         </div>
         ${S.ev && views ? `<p class="conv">El <b>${Math.round(buys / views * 100)} %</b> de los clics acaban en tu tienda.</p>` : S.ev ? '<p class="conv muted">Los clics aparecerán aquí cuando los compradores abran tus prendas.</p>' : ''}
         <div class="plist">${mine.length ? mine.map(p => `<div class="pitem"><div class="th" style="background:${tileBg(p)}">${pic(p)}</div>
@@ -2797,11 +2893,12 @@ async function warnSmallPhotos(files) {
 }
 
 async function publish() {
+  const AS = actingAs(), PU = AS ? AS.id : S.user.id, PP = AS || S.profile;
   const m = $('#fmsg'), btn = $('#fsend'); m.className = 'msg';
   const f = readForm(), photos = S.formPhotos.slice(0, MAX_PHOTOS), newPics = photos.filter(x => x.file).length;
   const bad = t => { m.classList.add('err'); m.textContent = t; };
   if (!f.name) return bad('Escribe el nombre del producto.');
-  if (!S.editing && !isAdmin() && (!S.profile.logo_url || !S.profile.cover_url)) return bad('Antes de publicar, sube el logo y la foto de portada de tu marca en «Perfil de marca».');
+  if (!S.editing && (!isAdmin() || AS) && (!PP.logo_url || !PP.cover_url)) return bad('Antes de publicar, sube el logo y la foto de portada de tu marca en «Perfil de marca».');
   if (!(f.price > 0)) return bad('Indica un precio mayor que 0.');
   if (!GENDERS.includes(S.formGender)) return bad('Elige para quién es la prenda: Mujer, Hombre o Unisex.');
   if (!S.formSizes.length) return bad('Marca las tallas que tienes disponibles (o «Talla única»).');
@@ -2811,16 +2908,16 @@ async function publish() {
   const ed = S.editing ? findProduct(S.editing) : null;
   btn.disabled = true; btn.textContent = newPics ? (newPics === 1 ? 'Subiendo foto…' : `Subiendo ${newPics} fotos…`) : 'Guardando…';
   try {
-    const r = await api.saveProduct(S.user.id, { ...f, tags: [...S.formTags], sizes: sortSizes(S.formSizes), gender: S.formGender }, photos, ed ? ed.id : null);
+    const r = await api.saveProduct(PU, { ...f, tags: [...S.formTags], sizes: sortSizes(S.formSizes), gender: S.formGender, ...(AS && !ed ? { status: 'approved' } : {}) }, photos, ed ? ed.id : null);
     await refreshProducts();
     S.editing = null; S.formTags = []; S.formSizes = []; S.formGender = ''; S.draft = null; clearPhotos();
-    const saved = ed ? findProduct(ed.id) : S.allProducts.filter(p => p.brand_id === S.user.id).sort((a, b) => String(b.created).localeCompare(String(a.created)))[0];
+    const saved = ed ? findProduct(ed.id) : S.allProducts.filter(p => p.brand_id === PU).sort((a, b) => String(b.created).localeCompare(String(a.created)))[0];
     const pending = saved && saved.status === 'pending';
     toast(r && r.imagesSkipped && photos.length > 1 ? 'Guardado solo con la primera foto: para guardar varias fotos falta ejecutar supabase/fotos.sql en Supabase.'
       : r && r.sizesSkipped ? 'Guardado, pero sin tallas: falta activar las tallas en la base de datos (tallas.sql).'
       : pending ? (ed ? 'Cambios guardados. La prenda vuelve a revisión antes de mostrarse.' : 'Prenda enviada. Se publicará en cuanto la revisemos.')
       : ed ? 'Cambios guardados' : 'Producto publicado. Ya aparece en el feed.');
-    VIEWS.panel();
+    reloadPanel();
   } catch (e) { bad('No se pudo guardar: ' + e.message); btn.disabled = false; btn.textContent = ed ? 'Guardar cambios' : 'Publicar producto'; }
 }
 
@@ -3203,7 +3300,7 @@ document.addEventListener('click', async e => {
     case 'canceledit': S.editing = null; S.formTags = []; S.formSizes = []; S.formGender = ''; clearPhotos(); S.draft = null; renderPanel(); break;
     case 'phrm': { const [x] = S.formPhotos.splice(+v, 1); if (x && x.preview) URL.revokeObjectURL(x.preview); refreshPhotos(); break; }
     case 'phfirst': { const [x] = S.formPhotos.splice(+v, 1); S.formPhotos.unshift(x); refreshPhotos(); break; }
-    case 'del': if (confirm('¿Eliminar este producto? No se puede deshacer.')) { try { await api.removeProduct(id); await refreshProducts(); toast('Producto eliminado'); VIEWS.panel(); } catch (err) { toast('No se pudo eliminar: ' + err.message); } } break;
+    case 'del': if (confirm('¿Eliminar este producto? No se puede deshacer.')) { try { await api.removeProduct(id); await refreshProducts(); toast('Producto eliminado'); reloadPanel(); } catch (err) { toast('No se pudo eliminar: ' + err.message); } } break;
     case 'makeadmin': try { await api.saveProfile(S.user.id, { role: 'admin' }); S.profile = { ...S.profile, role: 'admin' }; renderNav(); toast('Modo creador activado'); go('admin'); } catch (err) { toast(err.message); } break;
     case 'admintab': S.adminTab = v; renderAdminTab(); break;
     case 'chatto': openChatWith(id, b.dataset.p, b.dataset.text ? decodeURIComponent(b.dataset.text) : ''); break;
@@ -3235,7 +3332,11 @@ document.addEventListener('click', async e => {
     case 'resetsettings': if (confirm('¿Volver a los valores originales de la web?')) { try { await api.saveSettings(null); applySettings(null); renderNav(); renderAdminTab(); toast('Valores originales restaurados'); } catch (err) { toast('No se pudo restaurar: ' + err.message); } } break;
     case 'adminfeat': { const p = findProduct(id); try { await api.adminSetFeatured(id, !p.featured); await refreshProducts(); renderAdminTab(); } catch (err) { toast(err.message); } break; }
     case 'admindel': if (confirm('¿Eliminar este producto de la web? No se puede deshacer.')) { try { await api.removeProduct(id); await refreshProducts(); renderAdminTab(); toast('Producto eliminado'); } catch (err) { toast('No se pudo eliminar: ' + err.message); } } break;
+    case 'newbrand': createBrand(b); break;
+    case 'brandlink': brandLink(id, b); break;
+    case 'blcopy': try { await navigator.clipboard.writeText(S.blMsg || ''); toast('Mensaje copiado'); } catch { const i = $('#bl-link'); if (i) { i.select(); toast('Copia el enlace seleccionado'); } } break;
     case 'saveprofile': {
+      const AS = actingAs(), PU = AS ? AS.id : S.user.id, PP = AS || S.profile;
       const m = $('#pmsg'); m.className = 'msg';
       const perr = t => { m.classList.add('err'); m.textContent = t; };
       const patch = { brand_name: $('#p-brand').value.trim(), contact_email: $('#p-contact').value.trim(), brand_bio: $('#p-bio').value.trim().slice(0, 160) };
@@ -3254,21 +3355,22 @@ document.addEventListener('click', async e => {
       const sh = normShop({ ship: $('#s-ship').value, freeFrom: $('#s-free').value, dMin: $('#s-dmin').value, dMax: $('#s-dmax').value, ret: $('#s-ret').value, retFree: $('#s-retfree').checked });
       patch.shop_info = Object.fromEntries(Object.entries(sh).filter(([k, x]) => x != null && !(k === 'retFree' && !x)));
       const files = { logo: $('#p-logo').files[0], cover: $('#p-cover').files[0] };
-      if (!files.logo && !S.profile.logo_url) { perr('Sube el logo de tu marca: es obligatorio.'); break; }
-      if (!files.cover && !S.profile.cover_url) { perr('Sube una foto de portada: es obligatoria. Es lo que se ve en la portada de ' + C.appName + '.'); break; }
+      if (!files.logo && !PP.logo_url) { perr('Sube el logo de tu marca: es obligatorio.'); break; }
+      if (!files.cover && !PP.cover_url) { perr('Sube una foto de portada: es obligatoria. Es lo que se ve en la portada de ' + C.appName + '.'); break; }
       const badF = Object.values(files).find(f => f && (!/^image\/(png|jpeg|webp)$/.test(f.type) || f.size > 15e6));
       if (badF) { m.classList.add('err'); m.textContent = 'Las imágenes deben ser PNG, JPG o WEBP y pesar menos de 15 MB.'; break; }
       const btn = $('#psave'); btn.disabled = true; btn.textContent = files.logo || files.cover ? 'Subiendo imágenes…' : 'Guardando…';
       try {
-        if (files.logo) patch.logo_url = await api.uploadBrandImage(S.user.id, files.logo, 'logo');
-        if (files.cover) patch.cover_url = await api.uploadBrandImage(S.user.id, files.cover, 'cover');
-        await api.saveProfile(S.user.id, patch); S.profile = { ...S.profile, ...patch }; await refreshProducts();
+        if (files.logo) patch.logo_url = await api.uploadBrandImage(PU, files.logo, 'logo');
+        if (files.cover) patch.cover_url = await api.uploadBrandImage(PU, files.cover, 'cover');
+        await api.saveProfile(PU, patch); setPanelProf(patch); await refreshProducts();
         toast('Perfil guardado'); renderPanel();
       } catch (err) { m.classList.add('err'); m.textContent = 'No se pudo guardar: ' + err.message; btn.disabled = false; btn.textContent = 'Guardar perfil'; }
       break; }
     case 'rmimg': {
+      const AS = actingAs(), PU = AS ? AS.id : S.user.id;
       const k = v === 'logo' ? 'logo_url' : 'cover_url';
-      try { await api.saveProfile(S.user.id, { [k]: null }); S.profile = { ...S.profile, [k]: null }; await refreshProducts(); toast(v === 'logo' ? 'Logo quitado' : 'Portada quitada'); renderPanel(); }
+      try { await api.saveProfile(PU, { [k]: null }); setPanelProf({ [k]: null }); await refreshProducts(); toast(v === 'logo' ? 'Logo quitado' : 'Portada quitada'); renderPanel(); }
       catch (err) { toast('No se pudo quitar: ' + err.message); }
       break; }
   }
@@ -3316,7 +3418,7 @@ document.addEventListener('keydown', e => {
 const SITE_URL = (isUrl(C.siteUrl) && !/TU-USUARIO/i.test(C.siteUrl)) ? C.siteUrl.replace(/\/?$/, '/') : baseUrlNow();
 function baseUrlNow() { return location.href.split(/[?#]/)[0]; }
 const DEF_DESC = 'Descubre prendas de marcas independientes elegidas según tu estilo y tu talla. Haz el test de estilo en un minuto y compra directamente en la tienda de cada marca.';
-const PRIVATE_ROUTES = ['entrar', 'cuenta', 'panel', 'admin', 'mensajes', 'pago', 'guardados', '404'];
+const PRIVATE_ROUTES = ['entrar', 'cuenta', 'panel', 'gestionar', 'admin', 'mensajes', 'pago', 'guardados', '404'];
 function metaTag(attr, key) {
   let m = document.head.querySelector(`meta[${attr}="${key}"]`);
   if (!m) { m = document.createElement('meta'); m.setAttribute(attr, key); document.head.appendChild(m); }
@@ -3490,8 +3592,9 @@ function route() {
   if (S.route !== 'explorar') { S.q = ''; S.style = 'Todos'; }
   if (dlg.open) dlg.close();
   dlg.classList.remove('catdlg');
-  if (S.route !== 'gustos') S.draft = S.route === 'panel' ? S.draft : null;
-  if (S.route !== 'panel') { S.editing = null; if (S.route !== 'gustos') { S.formTags = []; S.formSizes = []; S.formGender = ''; clearPhotos(); } }
+  if (S.route !== 'gestionar') S.actAs = null;
+  if (S.route !== 'gustos') S.draft = ['panel', 'gestionar'].includes(S.route) ? S.draft : null;
+  if (!['panel', 'gestionar'].includes(S.route)) { S.editing = null; if (S.route !== 'gustos') { S.formTags = []; S.formSizes = []; S.formGender = ''; clearPhotos(); } }
   renderNav();
   VIEWS[S.route](arg);
   routeMeta(S.route, arg);
